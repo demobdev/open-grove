@@ -9,6 +9,14 @@
  */
 
 import type * as activity from "../activity.js";
+import type * as agent_chat from "../agent/chat.js";
+import type * as agent_data from "../agent/data.js";
+import type * as agent_embeddings from "../agent/embeddings.js";
+import type * as agent_limiter from "../agent/limiter.js";
+import type * as agent_models from "../agent/models.js";
+import type * as agent_tools from "../agent/tools.js";
+import type * as agent_triage from "../agent/triage.js";
+import type * as agent_vectorAgent from "../agent/vectorAgent.js";
 import type * as attachments from "../attachments.js";
 import type * as comments from "../comments.js";
 import type * as cycles from "../cycles.js";
@@ -37,6 +45,14 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   activity: typeof activity;
+  "agent/chat": typeof agent_chat;
+  "agent/data": typeof agent_data;
+  "agent/embeddings": typeof agent_embeddings;
+  "agent/limiter": typeof agent_limiter;
+  "agent/models": typeof agent_models;
+  "agent/tools": typeof agent_tools;
+  "agent/triage": typeof agent_triage;
+  "agent/vectorAgent": typeof agent_vectorAgent;
   attachments: typeof attachments;
   comments: typeof comments;
   cycles: typeof cycles;

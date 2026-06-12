@@ -26,11 +26,13 @@ import { LabelsPanel } from "@/components/issue-detail/labels-panel";
 import { RelationsPanel } from "@/components/issue-detail/relations-panel";
 import { AttachmentsPanel } from "@/components/issue-detail/attachments-panel";
 import { PlanLimitListener } from "@/components/billing/upgrade-prompt";
+import { AiTriagePanel } from "@/components/ai/triage-panel";
 
 export const issueDetailMainSlots: ComponentType<IssueDetailSlotProps>[] = [
   // ...CommentsPanel,
   SubIssuesPanel,
   ActivitySection,
+  AiTriagePanel,
   PlanLimitListener,
 ];
 
