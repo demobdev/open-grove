@@ -13,10 +13,10 @@ todos:
     status: completed
   - id: foundation-shell
     content: "App shell: marketing/app route groups, sidebar layout, org onboarding, theme toggle, shared primitives, command palette + shortcut registry, issue list/detail skeleton with slots"
-    status: in_progress
+    status: completed
   - id: foundation-conventions
     content: Write AGENTS.md (track file-ownership map + parallel-work rules) and design doc; commit foundation to main
-    status: pending
+    status: in_progress
   - id: track-briefs
     content: Create worktrees and launch parallel tracks A (board/views), B (projects/cycles), C (issue detail collab), D (AI agent), E (billing), F (landing)
     status: pending
