@@ -1,4 +1,4 @@
-# OpenGroove — Linear-Style Project Management for Teams
+# OpenGrove — Linear-Style Project Management for Teams
 
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](LICENSE.md)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
@@ -7,7 +7,7 @@
 [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind%20CSS-v4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178c6?logo=typescript)](https://www.typescriptlang.org/)
 
-> **⚠️ Disclaimer:** This is an **educational project** built for learning purposes only. "OpenGroove" is a fictional name used for this demo — we do not claim any trademark or intellectual property rights over it. This project is **not affiliated with, endorsed by, or connected to Linear, Jira, Asana, or any other project management platform**. All organization names, issues, and user data in the seed files are entirely fictional. Third-party service names (Clerk, Convex, Vercel, Next.js, OpenAI, Tailwind CSS, etc.) are trademarks of their respective owners and are used here solely to describe the technologies used in this project.
+> **⚠️ Disclaimer:** This is an **educational project** built for learning purposes only. "OpenGrove" is a fictional name used for this demo — we do not claim any trademark or intellectual property rights over it. This project is **not affiliated with, endorsed by, or connected to Linear, Jira, Asana, or any other project management platform**. All organization names, issues, and user data in the seed files are entirely fictional. Third-party service names (Clerk, Convex, Vercel, Next.js, OpenAI, Tailwind CSS, etc.) are trademarks of their respective owners and are used here solely to describe the technologies used in this project.
 
 A full-stack, real-time **Linear clone** — a B2B multi-tenant SaaS issue tracker where teams manage issues on Kanban boards, plan projects and cycles, collaborate with comments and mentions, and ship faster with a built-in **AI agent** that knows their entire workspace.
 
@@ -37,7 +37,7 @@ You'll need free accounts on these services to run the app. **Set them up before
 
 ## 🤔 What Is This App?
 
-Think of OpenGroove as **your own mini Linear** — a modern issue tracker built from scratch as a learning project, with the same keyboard-first, dense, dark-mode-default aesthetic.
+Think of OpenGrove as **your own mini Linear** — a modern issue tracker built from scratch as a learning project, with the same keyboard-first, dense, dark-mode-default aesthetic.
 
 It's a multi-tenant workspace app. Every organization gets its own isolated workspace, and members collaborate inside it in real time:
 
@@ -324,7 +324,7 @@ This runs the Next.js frontend and the Convex backend in parallel. Open [http://
 
 ## 🗄️ Database Schema Overview
 
-OpenGroove uses **Convex** as its database with a flat, relational schema design. All tables are defined in [`convex/schema.ts`](convex/schema.ts).
+OpenGrove uses **Convex** as its database with a flat, relational schema design. All tables are defined in [`convex/schema.ts`](convex/schema.ts).
 
 | Table                        | Purpose                           | Key Fields                                                                       |
 | ---------------------------- | --------------------------------- | -------------------------------------------------------------------------------- |
@@ -480,7 +480,7 @@ This project's source code is shared under the [Creative Commons Attribution-Non
 
 ### Trademark Notice
 
-"OpenGroove" is a fictional name used for this educational demo. We do not claim any trademark, copyright, or intellectual property rights over this name. If "OpenGroove" is a registered trademark belonging to another party, its use here is unintentional and purely for educational illustration. This project is **not affiliated with, endorsed by, or connected to Linear, Atlassian (Jira), Asana, or any other project management platform or company**. All third-party names and logos (Clerk, Convex, Vercel, Next.js, React, OpenAI, Tailwind CSS, TypeScript, etc.) are trademarks of their respective owners.
+"OpenGrove" is a fictional name used for this educational demo. We do not claim any trademark, copyright, or intellectual property rights over this name. If "OpenGrove" is a registered trademark belonging to another party, its use here is unintentional and purely for educational illustration. This project is **not affiliated with, endorsed by, or connected to Linear, Atlassian (Jira), Asana, or any other project management platform or company**. All third-party names and logos (Clerk, Convex, Vercel, Next.js, React, OpenAI, Tailwind CSS, TypeScript, etc.) are trademarks of their respective owners.
 
 See the full [LICENSE.md](LICENSE.md) for details.
 

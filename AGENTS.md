@@ -1,6 +1,6 @@
-# OpenGroove — Agent Guide
+# OpenGrove — Agent Guide
 
-OpenGroove is a Linear clone: a B2B multi-tenant SaaS built with **Next.js 16 (App Router) + Convex + Clerk (auth AND billing) + shadcn/ui + Tailwind 4 + pnpm**.
+OpenGrove is a Linear clone: a B2B multi-tenant SaaS built with **Next.js 16 (App Router) + Convex + Clerk (auth AND billing) + shadcn/ui + Tailwind 4 + pnpm**.
 
 This repo is built **foundation-first, then in parallel tracks**. Each track is developed by an agent in its own git worktree/branch. This file is the contract that keeps parallel work merge-safe.
 
@@ -81,6 +81,6 @@ Do not start dev servers or push to the Convex deployment from a worktree.
 ## Reference
 
 - Convex dev deployment: `modest-schnauzer-996` (project `vector-16da8`, team `sonny-sangha`). Main checkout runs `npx convex dev`.
-- Clerk app: "OpenGroove" (`app_3F1z9a2XnHPNAns4Oq4jbHon99c`), dev instance, JWT template `convex` (adds `org_id`/`org_slug`/`org_role` claims).
+- Clerk app: "OpenGrove" (`app_3F1z9a2XnHPNAns4Oq4jbHon99c`), dev instance, JWT template `convex` (adds `org_id`/`org_slug`/`org_role` claims).
 - Clerk webhooks → `https://modest-schnauzer-996.convex.site/clerk-webhook` (users, orgs, memberships, subscriptions all subscribed).
 - Design doc: `docs/specs/2026-06-12-linear-clone-design.md`.

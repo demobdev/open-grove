@@ -21,13 +21,13 @@ import { MockFrame, MockWindowBar } from "@/components/marketing/mock-window";
 import { cn } from "@/lib/utils";
 
 /**
- * The hero product mock: a full OpenGroove workspace window (sidebar + grouped
+ * The hero product mock: a full OpenGrove workspace window (sidebar + grouped
  * issue list) built from the same primitives the real app uses.
  */
 export function MockApp({ className }: { className?: string }) {
   return (
     <MockFrame className={className}>
-      <MockWindowBar title="opengroove.app/acme/team/eng" />
+      <MockWindowBar title="opengrove.app/acme/team/eng" />
       <div className="flex h-[26rem] text-[13px]">
         <MockSidebar />
         <div className="flex min-w-0 flex-1 flex-col">

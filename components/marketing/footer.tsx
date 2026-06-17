@@ -34,7 +34,7 @@ export function Footer() {
               <span className="flex size-6 items-center justify-center rounded bg-primary text-xs font-bold text-primary-foreground">
                 O
               </span>
-              OpenGroove
+              OpenGrove
             </Link>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               The issue tracker built for speed. Plan, track, and ship with
@@ -63,7 +63,7 @@ export function Footer() {
         </div>
         <div className="mt-12 flex flex-col items-start justify-between gap-3 border-t pt-6 sm:flex-row sm:items-center">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} OpenGroove. All systems operational.
+            © {new Date().getFullYear()} OpenGrove. All systems operational.
           </p>
           <p className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
             <span className="size-1.5 rounded-full bg-emerald-500" />

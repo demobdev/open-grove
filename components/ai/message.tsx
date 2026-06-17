@@ -116,7 +116,7 @@ export function AiMessage({ message }: { message: UIMessage }) {
           )}
         >
           <CircleAlert className="size-3" />
-          OpenGroove couldn&apos;t finish this response. Try sending your message
+          OpenGrove couldn&apos;t finish this response. Try sending your message
           again.
         </p>
       )}

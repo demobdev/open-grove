@@ -34,7 +34,7 @@ export function Hero() {
           The issue tracker built for speed
         </h1>
         <p className="mt-6 max-w-xl text-base text-balance text-muted-foreground md:text-lg">
-          OpenGroove is how fast product teams plan, track, and ship — issues,
+          OpenGrove is how fast product teams plan, track, and ship — issues,
           boards, and cycles in a keyboard-first workspace, with an AI agent
           that handles the busywork.
         </p>

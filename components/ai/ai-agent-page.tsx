@@ -151,9 +151,9 @@ function EmptyState({
           <Sparkles className="size-5 text-primary" />
         </div>
         <div className="flex flex-col gap-1">
-          <h2 className="text-base font-semibold">Ask OpenGroove</h2>
+          <h2 className="text-base font-semibold">Ask OpenGrove</h2>
           <p className="text-sm text-muted-foreground">
-            OpenGroove knows your teams, issues, projects and cycles — and can
+            OpenGrove knows your teams, issues, projects and cycles — and can
             create or update issues for you.
           </p>
         </div>

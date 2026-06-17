@@ -77,7 +77,7 @@ export function UpgradePromptDialog({
               planPeriod="month"
               for="organization"
               onSubscriptionComplete={() => {
-                toast.success("Welcome to OpenGroove Pro");
+                toast.success("Welcome to OpenGrove Pro");
                 onOpenChange(false);
               }}
               newSubscriptionRedirectUrl={

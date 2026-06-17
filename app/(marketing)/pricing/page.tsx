@@ -37,7 +37,7 @@ export default function PricingPage() {
         All prices in USD. Annual billing shows the per-month equivalent.
         Questions about Enterprise?{" "}
         <a
-          href="mailto:sales@opengroove.app"
+          href="mailto:sales@opengrove.app"
           className="text-foreground underline-offset-4 hover:underline"
         >
           Talk to us

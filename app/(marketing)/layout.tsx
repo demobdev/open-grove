@@ -19,7 +19,7 @@ export default function MarketingLayout({
             <span className="flex size-6 items-center justify-center rounded bg-primary text-xs font-bold text-primary-foreground">
               O
             </span>
-            OpenGroove
+            OpenGrove
           </Link>
           <nav className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>

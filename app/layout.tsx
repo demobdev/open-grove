@@ -16,11 +16,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "OpenGroove — Plan. Build. Ship.",
-    template: "%s · OpenGroove",
+    default: "OpenGrove — Plan. Build. Ship.",
+    template: "%s · OpenGrove",
   },
   description:
-    "OpenGroove is the issue tracker built for speed. Plan projects, run cycles, and ship with your team — with an AI agent on call.",
+    "OpenGrove is the issue tracker built for speed. Plan projects, run cycles, and ship with your team — with an AI agent on call.",
 };
 
 export default function RootLayout({
