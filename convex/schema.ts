@@ -224,4 +224,12 @@ export default defineSchema({
   })
     .index("by_org", ["orgId"])
     .index("by_creator", ["creatorId"]),
+
+  connectedRepos: defineTable({
+    orgId: v.id("organizations"),
+    repoName: v.string(), // e.g. "owner/repo"
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_repo", ["repoName"]),
 });

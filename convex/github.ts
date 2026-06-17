@@ -86,6 +86,20 @@ export const handleGithubEvent = internalMutation({
         
       if (!issue) continue;
       
+      // Verify that this repository is connected to the issue's organization
+      const repoFullName = body.repository?.full_name || "";
+      const isConnected = await ctx.db
+        .query("connectedRepos")
+        .withIndex("by_org", (q) => q.eq("orgId", issue.orgId))
+        // eslint-disable-next-line @convex-dev/no-filter-in-query
+        .filter((q) => q.eq(q.field("repoName"), repoFullName))
+        .first();
+        
+      if (!isConnected) {
+        console.warn(`Repository ${repoFullName} is not connected to organization ${issue.orgId}`);
+        continue;
+      }
+      
       if (args.event === "pull_request") {
         if (action === "opened" || action === "reopened") {
           // Transition status to in_progress if not already there or done/canceled
