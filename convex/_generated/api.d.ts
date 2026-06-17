@@ -20,6 +20,7 @@ import type * as agent_vectorAgent from "../agent/vectorAgent.js";
 import type * as attachments from "../attachments.js";
 import type * as comments from "../comments.js";
 import type * as cycles from "../cycles.js";
+import type * as github from "../github.js";
 import type * as http from "../http.js";
 import type * as issueRelations from "../issueRelations.js";
 import type * as issues from "../issues.js";
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   attachments: typeof attachments;
   comments: typeof comments;
   cycles: typeof cycles;
+  github: typeof github;
   http: typeof http;
   issueRelations: typeof issueRelations;
   issues: typeof issues;

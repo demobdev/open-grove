@@ -51,4 +51,67 @@ http.route({
   }),
 });
 
+async function verifyGithubSignature(secret: string, payload: string, signatureHeader: string): Promise<boolean> {
+  if (!signatureHeader.startsWith("sha256=")) {
+    return false;
+  }
+  const signature = signatureHeader.substring(7);
+  
+  const encoder = new TextEncoder();
+  const keyBuffer = encoder.encode(secret);
+  const dataBuffer = encoder.encode(payload);
+  
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyBuffer,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  
+  const signatureBuffer = await crypto.subtle.sign(
+    "HMAC",
+    cryptoKey,
+    dataBuffer
+  );
+  
+  const hashArray = Array.from(new Uint8Array(signatureBuffer));
+  const hexSignature = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+  
+  return hexSignature === signature;
+}
+
+http.route({
+  path: "/github-webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const payload = await request.text();
+    
+    // Signature verification is optional for easy local testing, but enforced if secret is set
+    const secret = process.env.GITHUB_WEBHOOK_SECRET;
+    if (secret) {
+      const signature = request.headers.get("x-hub-signature-256");
+      if (!signature) {
+        return new Response("Missing signature", { status: 401 });
+      }
+      const verified = await verifyGithubSignature(secret, payload, signature);
+      if (!verified) {
+        return new Response("Invalid signature", { status: 401 });
+      }
+    }
+
+    const event = request.headers.get("x-github-event");
+    if (!event) {
+      return new Response("Missing x-github-event header", { status: 400 });
+    }
+
+    await ctx.runMutation(internal.github.handleGithubEvent, {
+      event,
+      payload,
+    });
+
+    return new Response(null, { status: 200 });
+  }),
+});
+
 export default http;
