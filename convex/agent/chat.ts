@@ -249,7 +249,7 @@ export const streamResponse = internalAction({
       await saveMessage(ctx, components.agent, {
         threadId: args.threadId,
         userId: threadUserKey(args.orgId, args.userId),
-        agentName: "Vector",
+        agentName: "OpenGroove",
         message: { role: "assistant", content: reason },
       });
     }

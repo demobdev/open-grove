@@ -77,7 +77,7 @@ export function UpgradePromptDialog({
               planPeriod="month"
               for="organization"
               onSubscriptionComplete={() => {
-                toast.success("Welcome to Vector Pro");
+                toast.success("Welcome to OpenGroove Pro");
                 onOpenChange(false);
               }}
               newSubscriptionRedirectUrl={

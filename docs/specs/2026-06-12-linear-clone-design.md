@@ -1,11 +1,11 @@
-# Vector — Linear Clone Design
+# OpenGroove — Linear Clone Design
 
 Date: 2026-06-12
 Status: Approved (brainstormed + planned in chat; foundation built)
 
 ## Product
 
-Vector is a B2B multi-tenant Linear clone: organizations (workspaces) contain teams; teams contain issues with Linear-grade workflow features, realtime collaboration, and a plan-gated AI agent.
+OpenGroove is a B2B multi-tenant Linear clone: organizations (workspaces) contain teams; teams contain issues with Linear-grade workflow features, realtime collaboration, and a plan-gated AI agent.
 
 ## Stack
 
