@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { api } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx } from "./_generated/server";
 import { logActivity } from "./lib/activity";
@@ -145,6 +146,27 @@ export const create = orgMutation({
       type: "created",
     });
 
+    // Send Slack notification if configured
+    const connections = await ctx.db
+      .query("connectedRepos")
+      .withIndex("by_org", (q) => q.eq("orgId", ctx.org._id))
+      .collect();
+    const slackConnection = connections.find((c) => c.repoName.startsWith("slack:"));
+    if (slackConnection) {
+      const webhookUrl = slackConnection.repoName.substring(6);
+      const orgSlug = ctx.org.slug || ctx.org._id;
+      const issueUrl = `https://open-grove.vercel.app/${orgSlug}/issue/${issueId}`;
+      const issueKey = `${team.key}-${number}`;
+      const statusText = (args.status ?? "todo").toUpperCase();
+      const priorityText = (args.priority ?? "none").toUpperCase();
+      const text = `🚀 *New Issue Created* in *OpenGrove*\n*<${issueUrl}|[${issueKey}] ${args.title.trim()}>*\n• *Status:* \`${statusText}\` • *Priority:* \`${priorityText}\`\n• *Created by:* ${ctx.user.name}`;
+      
+      ctx.scheduler.runAfter(0, api.slack.postToSlack, {
+        webhookUrl,
+        text,
+      });
+    }
+
     return issueId;
   },
 });
@@ -181,6 +203,30 @@ export const update = orgMutation({
     if (args.status !== undefined && args.status !== issue.status) {
       updates.status = args.status;
       changes.push({ field: "status", oldValue: issue.status, newValue: args.status });
+
+      if (args.status === "done" || args.status === "canceled") {
+        const connections = await ctx.db
+          .query("connectedRepos")
+          .withIndex("by_org", (q) => q.eq("orgId", ctx.org._id))
+          .collect();
+        const slackConnection = connections.find((c) => c.repoName.startsWith("slack:"));
+        if (slackConnection) {
+          const webhookUrl = slackConnection.repoName.substring(6);
+          const orgSlug = ctx.org.slug || ctx.org._id;
+          const issueUrl = `https://open-grove.vercel.app/${orgSlug}/issue/${issue._id}`;
+          
+          const team = await ctx.db.get(issue.teamId);
+          const issueKey = team ? `${team.key}-${issue.number}` : `ISSUE-${issue.number}`;
+          const oldStatusText = issue.status.toUpperCase();
+          const newStatusText = args.status.toUpperCase();
+          const text = `🔄 *Issue Transitioned* to *${newStatusText}* in *OpenGrove*\n*<${issueUrl}|[${issueKey}] ${issue.title}>*\n• *Previous Status:* \`${oldStatusText}\` • *New Status:* \`${newStatusText}\`\n• *Updated by:* ${ctx.user.name}`;
+          
+          ctx.scheduler.runAfter(0, api.slack.postToSlack, {
+            webhookUrl,
+            text,
+          });
+        }
+      }
     }
     if (args.priority !== undefined && args.priority !== issue.priority) {
       updates.priority = args.priority;

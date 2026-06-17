@@ -2,7 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
-import { Loader2, GitBranch, Copy, Check, Info, Plus, Trash2, ExternalLink } from "lucide-react";
+import {
+  Loader2,
+  GitBranch,
+  Copy,
+  Check,
+  Info,
+  Plus,
+  Trash2,
+  ExternalLink,
+  MessageSquare,
+  Send,
+} from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,12 +34,20 @@ export default function IntegrationsSettingsPage() {
   const connectRepo = useMutation(api.githubConnection.connectRepo);
   const disconnectRepo = useMutation(api.githubConnection.disconnectRepo);
 
+  const slackWebhook = useQuery(api.slack.getSlackWebhook);
+  const saveSlackWebhook = useMutation(api.slack.saveSlackWebhook);
+  const sendTestMessage = useAction(api.slack.sendTestMessage);
+
   const [copied, setCopied] = useState(false);
   const [githubRepos, setGithubRepos] = useState<GitHubRepo[]>([]);
   const [loadingRepos, setLoadingRepos] = useState(true);
   const [reposError, setReposError] = useState<string | null>(null);
   const [selectedRepo, setSelectedRepo] = useState("");
   const [connecting, setConnecting] = useState(false);
+
+  const [slackUrl, setSlackUrl] = useState("");
+  const [savingSlack, setSavingSlack] = useState(false);
+  const [testingSlack, setTestingSlack] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -62,7 +81,14 @@ export default function IntegrationsSettingsPage() {
     };
   }, [fetchUserRepos]);
 
-  if (org === undefined || connectedRepos === undefined) {
+  useEffect(() => {
+    if (slackWebhook !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSlackUrl(slackWebhook ?? "");
+    }
+  }, [slackWebhook]);
+
+  if (org === undefined || connectedRepos === undefined || slackWebhook === undefined) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -113,19 +139,55 @@ export default function IntegrationsSettingsPage() {
     }
   };
 
-  // Filter out repos that are already connected
-  const connectedNames = new Set(connectedRepos.map((r) => r.repoName));
+  const handleSaveSlack = async () => {
+    setSavingSlack(true);
+    try {
+      await saveSlackWebhook({ webhookUrl: slackUrl });
+      toast.success("Slack Webhook URL saved successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save Slack Webhook");
+    } finally {
+      setSavingSlack(false);
+    }
+  };
+
+  const handleTestSlack = async () => {
+    if (!slackUrl) {
+      toast.error("Please enter a Webhook URL first");
+      return;
+    }
+    setTestingSlack(true);
+    try {
+      const res = await sendTestMessage({ webhookUrl: slackUrl });
+      if (res.success) {
+        toast.success("Test notification sent successfully to Slack!");
+      } else {
+        toast.error(`Failed to send test message: ${res.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to send test message");
+    } finally {
+      setTestingSlack(false);
+    }
+  };
+
+  // Filter connectedRepos to exclude Slack webhooks
+  const gitRepos = connectedRepos.filter((r) => !r.repoName.startsWith("slack:"));
+  const connectedNames = new Set(gitRepos.map((r) => r.repoName));
   const availableRepos = githubRepos.filter((r) => !connectedNames.has(r.fullName));
 
   return (
-    <>
+    <div className="flex flex-col gap-6 max-w-4xl">
       <div>
         <h1 className="text-base font-semibold">Integrations</h1>
         <p className="text-xs text-muted-foreground">
-          Connect external developer tools to your workspace.
+          Connect external developer tools and notification systems to your workspace.
         </p>
       </div>
 
+      {/* GitHub Integration */}
       <Card>
         <CardHeader className="flex flex-row items-center gap-4">
           <div className="flex size-10 items-center justify-center rounded-lg bg-foreground/5 ring-1 ring-foreground/10">
@@ -194,13 +256,13 @@ export default function IntegrationsSettingsPage() {
           </div>
 
           {/* Connected Repos list */}
-          {connectedRepos.length > 0 && (
+          {gitRepos.length > 0 && (
             <div className="flex flex-col gap-2">
               <label className="text-xs font-medium text-foreground">
                 Connected Repositories
               </label>
               <div className="rounded-lg border divide-y bg-muted/5">
-                {connectedRepos.map((repo) => (
+                {gitRepos.map((repo) => (
                   <div key={repo._id} className="flex items-center justify-between p-3 text-xs">
                     <div className="flex items-center gap-2">
                       <GitBranch className="size-4 text-muted-foreground" />
@@ -296,6 +358,79 @@ export default function IntegrationsSettingsPage() {
           </div>
         </CardContent>
       </Card>
-    </>
+
+      {/* Slack Webhook Integration */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-4">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-foreground/5 ring-1 ring-foreground/10">
+            <MessageSquare className="size-6 text-foreground" />
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <CardTitle>Slack Notifications</CardTitle>
+            <CardDescription>
+              Post notifications to a Slack channel when issues are created or status is changed to done or canceled.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 pt-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-medium text-foreground">
+              Slack Incoming Webhook URL
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={slackUrl}
+                onChange={(e) => setSlackUrl(e.target.value)}
+                placeholder="https://hooks.slack.com/services/..."
+                className="flex-1 rounded-md border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <Button
+                size="sm"
+                className="h-8 gap-1.5 text-xs px-3"
+                onClick={handleSaveSlack}
+                disabled={savingSlack}
+              >
+                {savingSlack ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  "Save Webhook"
+                )}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              To obtain a URL, go to your Slack Workspace settings, create a Slack App with &quot;Incoming Webhooks&quot; enabled, and add a webhook to your target channel.
+            </p>
+          </div>
+
+          {slackWebhook && (
+            <div className="flex flex-col gap-2 border-t pt-4">
+              <label className="text-xs font-medium text-foreground">
+                Testing Utility
+              </label>
+              <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/5">
+                <span className="text-[11px] text-muted-foreground">
+                  Send a sample notification message to verify your connection works.
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1.5 text-[11px] px-2.5"
+                  onClick={handleTestSlack}
+                  disabled={testingSlack}
+                >
+                  {testingSlack ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <Send className="size-3" />
+                  )}
+                  Send Test Message
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

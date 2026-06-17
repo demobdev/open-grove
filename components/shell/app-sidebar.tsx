@@ -3,6 +3,7 @@
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import {
+  Bell,
   Bot,
   Box,
   ChevronDown,
@@ -109,6 +110,9 @@ export function AppSidebar() {
         <nav className="flex flex-col gap-0.5 pb-2">
           <NavLink href={base} exact icon={<Box className="size-4" />}>
             Workspace
+          </NavLink>
+          <NavLink href={`${base}/inbox`} icon={<Bell className="size-4" />}>
+            Inbox
           </NavLink>
           {/* Track B adds /projects + /cycles nav; Track D adds /ai nav */}
           <NavLink href={`${base}/projects`} icon={<Box className="size-4" />}>
