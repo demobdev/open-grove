@@ -11,6 +11,8 @@ import {
   chatModel,
   isAiConfigured,
 } from "./models";
+import { orgMutation, orgQuery } from "../lib/customFunctions";
+import { logActivity } from "../lib/activity";
 
 /**
  * Triage assist for the issue detail page (Track D).
@@ -209,4 +211,95 @@ export const suggestTriage = action({
       };
     }
   },
+});
+
+export const getPendingSuggestions = orgQuery({
+  args: { issueId: v.id("issues") },
+  handler: async (ctx, args) => {
+    const comments = await ctx.db
+      .query("comments")
+      .withIndex("by_issue", (q) => q.eq("issueId", args.issueId))
+      .collect();
+    
+    return comments.map(c => {
+      const match = c.body.match(/<!-- (.*) -->/);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[1]);
+          if (parsed.aiSuggestion) {
+            return {
+              commentId: c._id,
+              body: c.body,
+              suggestion: parsed.aiSuggestion,
+            };
+          }
+        } catch {
+          // ignore
+        }
+      }
+      return null;
+    }).filter((x): x is NonNullable<typeof x> => x !== null);
+  }
+});
+
+export const resolveSuggestion = orgMutation({
+  args: {
+    commentId: v.id("comments"),
+    accept: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const comment = await ctx.db.get(args.commentId);
+    if (!comment || comment.orgId !== ctx.org._id) return;
+    
+    if (!args.accept) {
+      await ctx.db.delete(args.commentId);
+      return;
+    }
+    
+    // If accept, update the comment to remove the suggestion and update issue status
+    const match = comment.body.match(/<!-- (.*) -->/);
+    if (!match) return;
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let suggestionData: any;
+    try {
+      suggestionData = JSON.parse(match[1]).aiSuggestion;
+    } catch {
+      return;
+    }
+    
+    const newBody = comment.body
+      .replace(/🤖 \*\*AI Suggestion\*\*.+?: Does this .+? belong here\?/, `🤖 **AI Semantic Link** (confidence: **${suggestionData.confidence}%**): Associated ` + (suggestionData.type === 'link_pr' ? (suggestionData.status === 'merged' ? 'merged pull request' : 'pull request') : 'commit'))
+      .replace(/\n\n<!-- .* -->/, "");
+    
+    await ctx.db.patch(args.commentId, { body: newBody });
+    
+    // Update issue status
+    const issue = await ctx.db.get(comment.issueId);
+    if (issue) {
+       let newStatus = issue.status;
+       if (suggestionData.type === 'link_pr') {
+         if (suggestionData.status === 'merged') {
+            if (newStatus !== 'done') newStatus = 'done';
+         } else if (suggestionData.status === 'opened' || suggestionData.status === 'reopened') {
+            if (newStatus !== 'in_progress' && newStatus !== 'done' && newStatus !== 'canceled') {
+               newStatus = 'in_progress';
+            }
+         }
+       }
+       if (newStatus !== issue.status) {
+         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         await ctx.db.patch(issue._id, { status: newStatus as any });
+         await logActivity(ctx, {
+            orgId: issue.orgId,
+            issueId: issue._id,
+            actorId: ctx.user._id,
+            type: "status_changed",
+            field: "status",
+            oldValue: issue.status,
+            newValue: newStatus,
+         });
+       }
+    }
+  }
 });

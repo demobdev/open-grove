@@ -11,7 +11,7 @@ const TESTIMONIALS: {
 }[] = [
   {
     quote:
-      "We moved four thousand issues over a weekend and nobody asked how to use it on Monday. It’s that obvious.",
+      "OpenGrove caught PRs our team forgot to link and moved the right issues before standup. It’s the first tracker that feels like it’s paying attention.",
     name: "Mara Lindqvist",
     role: "VP Engineering",
     company: "Tidal",
@@ -19,7 +19,7 @@ const TESTIMONIALS: {
   },
   {
     quote:
-      "The cycle reports the agent writes are better than the ones I used to write. I checked. Twice.",
+      "We stopped asking ‘what’s the status?’ because the board finally matched the repo.",
     name: "Theo Park",
     role: "Engineering Lead",
     company: "Aperture",
@@ -27,7 +27,7 @@ const TESTIMONIALS: {
   },
   {
     quote:
-      "OpenGrove is the first tracker our engineers don’t complain about. ⌘K does everything, and the board never lags.",
+      "Our juniors don’t have to memorize every workflow rule, and our seniors don’t have to clean up after them. That alone sold it.",
     name: "Ada Okafor",
     role: "CTO",
     company: "Hexa Labs",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useAction, useMutation } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { CopyX, Loader2, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -59,6 +59,15 @@ function TriagePanelInner({ issue }: IssueDetailSlotProps) {
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState(false);
+
+  const pendingSuggestions = useQuery(api.agent.triage.getPendingSuggestions, { issueId: issue._id });
+  const resolveSuggestionMutation = useMutation(api.agent.triage.resolveSuggestion);
+
+  const handleResolveSuggestion = (commentId: Id<"comments">, accept: boolean) => {
+    resolveSuggestionMutation({ commentId, accept })
+      .then(() => toast.success(accept ? "Link accepted" : "Link discarded"))
+      .catch((error: unknown) => toast.error(convexErrorMessage(error, "Failed to resolve link")));
+  };
 
   // Auto-run duplicate detection once per issue view; also nudge the org
   // embedding backfill so older issues are searchable.
@@ -256,6 +265,42 @@ function TriagePanelInner({ issue }: IssueDetailSlotProps) {
               </div>
             </div>
           ) : null}
+        </>
+      )}
+
+      {/* Semantic Link Suggestions */}
+      {pendingSuggestions && pendingSuggestions.length > 0 && (
+        <>
+          <Separator />
+          <div className="flex flex-col gap-1.5">
+            <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+              <Sparkles className="size-3" />
+              Suggested links
+            </p>
+            <ul className="flex flex-col gap-2">
+              {pendingSuggestions.map(({ commentId, suggestion }) => (
+                <li key={commentId} className="flex flex-col gap-2 rounded-md border p-2 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-muted-foreground">
+                      {suggestion.type === "link_pr" 
+                        ? `Does PR #${suggestion.prNumber} belong here?` 
+                        : `Does commit ${suggestion.commitHash} belong here?`}
+                    </span>
+                    <span className="shrink-0 rounded-full border px-1.5 text-[10px] text-muted-foreground">
+                      {suggestion.confidence}% match
+                    </span>
+                  </div>
+                  <div className="font-medium line-clamp-2">
+                    {suggestion.type === "link_pr" ? suggestion.prTitle : suggestion.message}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Button size="sm" variant="secondary" className="h-6 text-xs px-2" onClick={() => handleResolveSuggestion(commentId, true)}>Accept</Button>
+                    <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => handleResolveSuggestion(commentId, false)}>Discard</Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         </>
       )}
     </section>

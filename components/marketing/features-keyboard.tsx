@@ -1,14 +1,15 @@
-import { Kbd } from "@/components/marketing/kbd";
 import { MockCommandPalette } from "@/components/marketing/mock-command-palette";
 import { Section, SectionHeading } from "@/components/marketing/section";
 
-const SHORTCUTS: { keys: string[]; label: string }[] = [
-  { keys: ["⌘", "K"], label: "Command palette" },
-  { keys: ["C"], label: "Create issue" },
-  { keys: ["A"], label: "Assign" },
-  { keys: ["L"], label: "Add label" },
-  { keys: ["B"], label: "Open board" },
-  { keys: ["⌘", "J"], label: "Ask the agent" },
+const COMMANDS = [
+  "Create issue",
+  "Connect GitHub repo",
+  "Show unlinked PRs",
+  "Switch repository",
+  "Ask agent about this cycle",
+  "Create issue from PR #218",
+  "Approve suggested link",
+  "Summarize what shipped",
 ];
 
 export function FeaturesKeyboard() {
@@ -17,22 +18,17 @@ export function FeaturesKeyboard() {
       <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
         <div>
           <SectionHeading
-            eyebrow="04 · Keyboard-first"
-            title="Your hands never leave the keyboard"
-            lede="Everything in OpenGrove is a command. One palette, single-key shortcuts, and zero context switches between thinking and doing."
+            eyebrow="05 · Command Center"
+            title="One shortcut for everything"
+            lede="OpenGrove’s command bar is more than navigation. Create issues, switch repos, approve AI suggestions, ask the agent, and move work across the system from one place."
           />
           <div className="mt-10 space-y-2.5">
-            {SHORTCUTS.map((shortcut) => (
+            {COMMANDS.map((cmd) => (
               <div
-                key={shortcut.label}
+                key={cmd}
                 className="flex h-9 items-center justify-between rounded-lg border bg-card/50 px-3 text-sm"
               >
-                <span className="text-foreground/90">{shortcut.label}</span>
-                <span className="flex items-center gap-1">
-                  {shortcut.keys.map((key) => (
-                    <Kbd key={key}>{key}</Kbd>
-                  ))}
-                </span>
+                <span className="text-foreground/90 font-mono text-xs">&gt; {cmd}</span>
               </div>
             ))}
           </div>

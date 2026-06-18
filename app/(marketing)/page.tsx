@@ -3,6 +3,7 @@ import { Cta } from "@/components/marketing/cta";
 import { FeatureGrid } from "@/components/marketing/feature-grid";
 import { FeaturesAi } from "@/components/marketing/features-ai";
 import { FeaturesBoard } from "@/components/marketing/features-board";
+import { FeaturesGithub } from "@/components/marketing/features-github";
 import { FeaturesIssues } from "@/components/marketing/features-issues";
 import { FeaturesKeyboard } from "@/components/marketing/features-keyboard";
 import { Footer } from "@/components/marketing/footer";
@@ -24,6 +25,7 @@ export default function LandingPage() {
         <LogoCloud />
         <FeaturesIssues />
         <FeaturesBoard />
+        <FeaturesGithub />
         <FeaturesAi />
         <FeaturesKeyboard />
         <FeatureGrid />

@@ -15,21 +15,21 @@ export function Cta() {
       />
       <div className="mx-auto flex w-full max-w-6xl flex-col items-center px-6 py-24 text-center md:py-32">
         <h2 className="max-w-2xl text-4xl font-semibold tracking-tighter text-balance md:text-5xl">
-          Stop managing your tracker. Start shipping.
+          Stop syncing your tracker by hand. Start shipping.
         </h2>
         <p className="mt-5 max-w-md text-base text-balance text-muted-foreground">
-          Set up your workspace in under a minute. Free for teams of three —
-          upgrade when the roadmap outgrows you.
+          Connect your repos, create your first team, and let OpenGrove keep
+          issues, PRs, commits, cycles, and agent activity in one fast workspace.
         </p>
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
           <Button size="lg" className="h-10 px-5" asChild>
             <Link href="/sign-up">
-              Get started for free
+              Get started free
               <ArrowRight className="size-4" />
             </Link>
           </Button>
           <Button size="lg" variant="ghost" className="h-10 px-5" asChild>
-            <Link href="/pricing">Compare plans</Link>
+            <Link href="/sign-up">Connect GitHub</Link>
           </Button>
         </div>
       </div>

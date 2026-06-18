@@ -139,13 +139,20 @@ function SidebarItem({
 
 export function MockIssueRow({ issue }: { issue: MockIssue }) {
   return (
-    <div className="flex h-9 items-center gap-3 border-b px-4 transition-colors hover:bg-accent/50">
-      <PriorityIcon priority={issue.priority} className="size-3.5" />
+    <div className="flex items-center gap-3 border-b px-4 py-1.5 transition-colors hover:bg-accent/50 min-h-[36px]">
+      <PriorityIcon priority={issue.priority} className="size-3.5 shrink-0" />
       <span className="w-14 shrink-0 font-mono text-[11px] text-muted-foreground">
         {issue.id}
       </span>
-      <StatusIcon status={issue.status} className="size-3.5" />
-      <span className="min-w-0 flex-1 truncate font-medium">{issue.title}</span>
+      <StatusIcon status={issue.status} className="size-3.5 shrink-0" />
+      <div className="min-w-0 flex-1 flex flex-col justify-center">
+        <span className="truncate font-medium leading-tight">{issue.title}</span>
+        {issue.subtitle && (
+          <span className="truncate text-[10px] text-muted-foreground mt-0.5">
+            {issue.subtitle}
+          </span>
+        )}
+      </div>
       {issue.label ? (
         <LabelChip
           name={issue.label.name}
@@ -161,7 +168,7 @@ export function MockIssueRow({ issue }: { issue: MockIssue }) {
       {issue.assignee ? (
         <UserAvatar name={issue.assignee} />
       ) : (
-        <span className="size-5 rounded-full border border-dashed border-muted-foreground/40" />
+        <span className="size-5 shrink-0 rounded-full border border-dashed border-muted-foreground/40" />
       )}
     </div>
   );

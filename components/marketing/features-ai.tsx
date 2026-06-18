@@ -19,30 +19,30 @@ export function FeaturesAi() {
             Included in Pro & Enterprise
           </div>
           <SectionHeading
-            eyebrow="03 · AI Agent"
-            title="An AI agent on the roster"
-            lede="OpenGrove's agent works inside your workspace with org-scoped tools — it files issues, summarizes cycles, drafts standups, and catches duplicates before they ship."
+            eyebrow="04 · AI Agent"
+            title="An agent that understands the work"
+            lede="OpenGrove’s agent reads your issues, cycles, projects, and GitHub activity with org-scoped permissions — so it can summarize what shipped, spot risk, create follow-up issues, and keep the team moving."
           />
           <div className="mt-10 grid gap-7 sm:grid-cols-2">
             <FeatureBullet
               icon={MessagesSquare}
-              title="Chat with context"
-              description="It knows your teams, cycles, and backlog — answers come from your data, not the void."
-            />
-            <FeatureBullet
-              icon={Workflow}
-              title="Tools, not just talk"
-              description="Creates, updates, and searches issues with the same permission checks as any member."
+              title="Ask about the repo"
+              description="“What changed in open-grove this week?” gets answered from PRs, commits, and linked issues."
             />
             <FeatureBullet
               icon={FileText}
-              title="Reports on demand"
-              description="Standups and cycle summaries written from real activity, ready to paste anywhere."
+              title="Cycle reports on demand"
+              description="Generate standups and cycle summaries from real activity, not scattered Slack memory."
             />
             <FeatureBullet
               icon={Crosshair}
-              title="Duplicate radar"
-              description="Semantic search over every issue flags lookalikes the moment something is filed."
+              title="Find work that slipped"
+              description="The agent surfaces PRs and commits that were never connected to an issue."
+            />
+            <FeatureBullet
+              icon={Workflow}
+              title="Create next actions"
+              description="Turn blockers, TODOs, and review notes into issues without leaving the flow."
             />
           </div>
         </div>

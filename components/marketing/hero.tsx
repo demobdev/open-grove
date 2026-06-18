@@ -26,7 +26,7 @@ export function Hero() {
             <Sparkles className="size-2.5" />
             New
           </span>
-          The AI agent joins your team on Pro
+          Your board now understands your repos
           <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
         </Link>
 
@@ -34,8 +34,8 @@ export function Hero() {
           The issue tracker built for speed
         </h1>
         <p className="mt-6 max-w-xl text-base text-balance text-muted-foreground md:text-lg">
-          OpenGrove is how fast product teams plan, track, and ship — issues,
-          boards, and cycles in a keyboard-first workspace, with an AI agent
+          Plan work, ship code, and let OpenGrove keep the board in sync — with
+          keyboard-first issues, live cycles, semantic PR linking, and an AI agent
           that handles the busywork.
         </p>
 

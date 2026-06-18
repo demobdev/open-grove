@@ -27,6 +27,7 @@ export type MockIssue = {
   assignee?: string;
   label?: MockLabel;
   due?: string;
+  subtitle?: string;
 };
 
 export const MOCK_PEOPLE = {
@@ -38,41 +39,23 @@ export const MOCK_PEOPLE = {
   sam: "Sam Rivera",
 } as const;
 
-/** Grouped list shown inside the hero app window. */
 export const HERO_ISSUE_GROUPS: {
   status: IssueStatus;
   label: string;
   issues: MockIssue[];
 }[] = [
   {
-    status: "in_progress",
-    label: "In Progress",
+    status: "in_review",
+    label: "In Review",
     issues: [
       {
-        id: "ENG-142",
-        title: "Polish board drag physics on long columns",
-        status: "in_progress",
-        priority: "urgent",
-        assignee: MOCK_PEOPLE.ada,
-        label: MOCK_LABELS.design,
-        due: "Jun 16",
-      },
-      {
-        id: "ENG-139",
-        title: "Fix flaky websocket reconnect after laptop resume",
-        status: "in_progress",
+        id: "ENG-147",
+        title: "Migrate issue search to the vector index",
+        status: "in_review",
         priority: "high",
-        assignee: MOCK_PEOPLE.jonas,
-        label: MOCK_LABELS.bug,
-      },
-      {
-        id: "ENG-135",
-        title: "Stream agent tool calls into the activity feed",
-        status: "in_progress",
-        priority: "medium",
-        assignee: MOCK_PEOPLE.ivy,
-        label: MOCK_LABELS.feature,
-        due: "Jun 18",
+        assignee: MOCK_PEOPLE.theo,
+        label: MOCK_LABELS.performance,
+        subtitle: "PR #218 linked · In review",
       },
     ],
   },
@@ -81,28 +64,28 @@ export const HERO_ISSUE_GROUPS: {
     label: "Todo",
     issues: [
       {
-        id: "ENG-147",
-        title: "Migrate issue search to the vector index",
-        status: "todo",
-        priority: "high",
-        assignee: MOCK_PEOPLE.theo,
-        label: MOCK_LABELS.performance,
-      },
-      {
         id: "ENG-146",
         title: "Cycle burndown drifts across weekend boundaries",
         status: "todo",
         priority: "medium",
         assignee: MOCK_PEOPLE.mara,
         label: MOCK_LABELS.bug,
-        due: "Jun 20",
+        subtitle: "Blocked · Needs data backfill",
       },
+    ],
+  },
+  {
+    status: "done",
+    label: "Done",
+    issues: [
       {
-        id: "ENG-144",
-        title: "Batch activity log writes during bulk triage",
-        status: "todo",
-        priority: "low",
-        label: MOCK_LABELS.infra,
+        id: "ENG-135",
+        title: "Stream agent tool calls into activity feed",
+        status: "done",
+        priority: "medium",
+        assignee: MOCK_PEOPLE.ivy,
+        label: MOCK_LABELS.feature,
+        subtitle: "Merged · Done",
       },
     ],
   },

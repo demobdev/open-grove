@@ -1,10 +1,10 @@
 import {
-  AtSign,
-  Boxes,
+  GitBranch,
+  Inbox,
+  History,
+  Shield,
   ListFilter,
-  Paperclip,
   Search,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import { Section, SectionHeading } from "@/components/marketing/section";
@@ -23,28 +23,28 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
       "Slice the backlog by status, assignee, label, or cycle — then save the view for the team.",
   },
   {
-    icon: Paperclip,
-    title: "Attachments",
+    icon: GitBranch,
+    title: "Repo mapping",
     description:
-      "Drop logs, screenshots, and specs straight onto the issue. Stored alongside the work.",
+      "Connect multiple repositories to a team or project and keep work scoped to the right codebase.",
   },
   {
-    icon: AtSign,
-    title: "Mentions & threads",
+    icon: Inbox,
+    title: "AI Suggestions Inbox",
     description:
-      "Pull the right person into the conversation with @mentions that notify instantly.",
+      "Review uncertain matches, duplicate warnings, and follow-up tasks before they touch the board.",
   },
   {
-    icon: Users,
-    title: "Live presence",
+    icon: History,
+    title: "Activity timeline",
     description:
-      "See who's viewing an issue right now, so you never collide on an edit or a triage call.",
+      "Every issue shows status changes, comments, PRs, commits, and agent actions in one history.",
   },
   {
-    icon: Boxes,
-    title: "Multi-team workspaces",
+    icon: Shield,
+    title: "Org-scoped permissions",
     description:
-      "Each team gets its own key, board, and cycles — ENG-142 means the same thing to everyone.",
+      "Agents and automations only act inside the teams, repos, and workspaces they’re allowed to access.",
   },
 ];
 
@@ -52,7 +52,7 @@ export function FeatureGrid() {
   return (
     <Section>
       <SectionHeading
-        eyebrow="05 · Everything else"
+        eyebrow="06 · Everything else"
         title="All the table stakes, none of the bloat"
         lede="The features you expect from a serious tracker — built in, fast, and out of your way."
         align="center"

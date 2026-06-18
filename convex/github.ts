@@ -1,6 +1,10 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery, internalAction } from "./_generated/server";
 import { logActivity } from "./lib/activity";
+import { internal } from "./_generated/api";
+import { hasAiAccess } from "./lib/limits";
+import { embedText } from "./agent/embeddings";
+import { isAiConfigured } from "./agent/models";
 
 // Extract unique issue keys like "ENG-12" from text
 function extractIssueKeys(text: string): { key: string; number: number }[] {
@@ -61,7 +65,37 @@ export const handleGithubEvent = internalMutation({
     
     const issueKeys = extractIssueKeys(textToScan);
     if (issueKeys.length === 0) {
-      return { processed: 0, reason: "No issue keys found in payload" };
+      const repoFullName = body.repository?.full_name || "";
+      const connections = await ctx.db
+        .query("connectedRepos")
+        .withIndex("by_repo", (q) => q.eq("repoName", repoFullName))
+        .collect();
+      
+      if (connections.length === 0) {
+        return { processed: 0, reason: "Repository not connected to any organization" };
+      }
+      
+      // For each connection, schedule the semantic link background action
+      for (const conn of connections) {
+        await ctx.scheduler.runAfter(0, internal.github.handleSemanticGithubEvent, {
+          orgId: conn.orgId,
+          event: args.event,
+          payloadText: textToScan,
+          repoFullName,
+          action,
+          prUrl,
+          prTitle,
+          prNumber,
+          senderLogin,
+          commits: args.event === "push" ? (body.commits || []).map((c: GitHubCommit) => ({
+            message: c.message || "",
+            id: c.id || "",
+            url: c.url || "",
+          })) : undefined,
+          merged: args.event === "pull_request" ? (body.pull_request?.merged || false) : undefined,
+        });
+      }
+      return { processed: 0, status: "scheduled_semantic_scan" };
     }
     
     let processedCount = 0;
@@ -171,5 +205,277 @@ export const handleGithubEvent = internalMutation({
     }
     
     return { processed: processedCount };
+  },
+});
+
+export const getOrganizationById = internalQuery({
+  args: { orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.orgId);
+  },
+});
+
+export const handleSemanticGithubEvent = internalAction({
+  args: {
+    orgId: v.id("organizations"),
+    event: v.string(),
+    payloadText: v.string(),
+    repoFullName: v.string(),
+    action: v.string(),
+    prUrl: v.string(),
+    prTitle: v.string(),
+    prNumber: v.number(),
+    senderLogin: v.string(),
+    commits: v.optional(
+      v.array(
+        v.object({
+          message: v.string(),
+          id: v.string(),
+          url: v.string(),
+        })
+      )
+    ),
+    merged: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    // 1. Get the organization and check AI access
+    const org = await ctx.runQuery(internal.github.getOrganizationById, { orgId: args.orgId });
+    if (!org) {
+      console.warn(`Organization ${args.orgId} not found.`);
+      return;
+    }
+    
+    // Check if AI features are enabled/configured
+    if (!hasAiAccess(org)) {
+      console.warn(`Organization ${args.orgId} does not have AI access.`);
+      return;
+    }
+    
+    if (!isAiConfigured()) {
+      console.warn("Skipping semantic auto-link: OPENAI_API_KEY is not set");
+      return;
+    }
+    
+    // 2. Generate embedding for the payloadText
+    const embedding = await embedText(args.payloadText);
+    
+    // 3. Search issues by embedding
+    const results = await ctx.vectorSearch("issues", "by_embedding", {
+      vector: embedding,
+      limit: 5,
+      filter: (q) => q.eq("orgId", args.orgId),
+    });
+    
+    // Filter by similarity threshold
+    const AUTO_LINK_THRESHOLD = 0.88;
+    const MIN_SCORE_GAP = 0.04;
+    const SUGGESTION_THRESHOLD = 0.78;
+
+    const candidates = results.filter((r) => r._score >= SUGGESTION_THRESHOLD);
+    if (candidates.length === 0) {
+      console.log(`No issue match found with similarity >= ${SUGGESTION_THRESHOLD} for text: "${args.payloadText.slice(0, 100)}..."`);
+      return;
+    }
+    
+    // Top match
+    const bestMatch = candidates[0];
+    const secondBestScore = candidates.length > 1 ? candidates[1]._score : 0;
+    const confidencePct = Math.round(bestMatch._score * 100);
+    
+    const isHighConfidence = bestMatch._score >= AUTO_LINK_THRESHOLD && (bestMatch._score - secondBestScore) >= MIN_SCORE_GAP;
+
+    if (isHighConfidence) {
+      // 4. Execute the mutation to link the issue and transition status
+      await ctx.runMutation(internal.github.linkSemanticIssueEvent, {
+        orgId: args.orgId,
+        issueId: bestMatch._id,
+        event: args.event,
+        action: args.action,
+        prUrl: args.prUrl,
+        prTitle: args.prTitle,
+        prNumber: args.prNumber,
+        senderLogin: args.senderLogin,
+        confidencePct,
+        commits: args.commits,
+        merged: args.merged,
+      });
+    } else {
+      // Medium confidence: Suggestion
+      await ctx.runMutation(internal.github.createSemanticSuggestionEvent, {
+        orgId: args.orgId,
+        issueId: bestMatch._id,
+        event: args.event,
+        action: args.action,
+        prUrl: args.prUrl,
+        prTitle: args.prTitle,
+        prNumber: args.prNumber,
+        senderLogin: args.senderLogin,
+        confidencePct,
+        commits: args.commits,
+        merged: args.merged,
+      });
+    }
+  },
+});
+
+export const linkSemanticIssueEvent = internalMutation({
+  args: {
+    orgId: v.id("organizations"),
+    issueId: v.id("issues"),
+    event: v.string(),
+    action: v.string(),
+    prUrl: v.string(),
+    prTitle: v.string(),
+    prNumber: v.number(),
+    senderLogin: v.string(),
+    confidencePct: v.number(),
+    commits: v.optional(
+      v.array(
+        v.object({
+          message: v.string(),
+          id: v.string(),
+          url: v.string(),
+        })
+      )
+    ),
+    merged: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const issue = await ctx.db.get(args.issueId);
+    if (!issue || issue.orgId !== args.orgId) {
+      console.warn(`Issue ${args.issueId} not found or mismatch org.`);
+      return;
+    }
+    
+    // Transition status and log activity
+    if (args.event === "pull_request") {
+      if (args.action === "opened" || args.action === "reopened") {
+        if (issue.status !== "in_progress" && issue.status !== "done" && issue.status !== "canceled") {
+          await ctx.db.patch(issue._id, { status: "in_progress" });
+          await logActivity(ctx, {
+            orgId: issue.orgId,
+            issueId: issue._id,
+            actorId: issue.creatorId,
+            type: "status_changed",
+            field: "status",
+            oldValue: issue.status,
+            newValue: "in_progress",
+          });
+        }
+        
+        await ctx.db.insert("comments", {
+          orgId: issue.orgId,
+          issueId: issue._id,
+          authorId: issue.creatorId,
+          body: `🤖 **AI Semantic Link** (confidence: **${args.confidencePct}%**): Associated pull request **#${args.prNumber}** opened by @${args.senderLogin}: [${args.prTitle}](${args.prUrl})`,
+        });
+      } else if (args.action === "closed" && args.merged) {
+        if (issue.status !== "done") {
+          await ctx.db.patch(issue._id, { status: "done" });
+          await logActivity(ctx, {
+            orgId: issue.orgId,
+            issueId: issue._id,
+            actorId: issue.creatorId,
+            type: "status_changed",
+            field: "status",
+            oldValue: issue.status,
+            newValue: "done",
+          });
+        }
+        
+        await ctx.db.insert("comments", {
+          orgId: issue.orgId,
+          issueId: issue._id,
+          authorId: issue.creatorId,
+          body: `🤖 **AI Semantic Link** (confidence: **${args.confidencePct}%**): Associated merged pull request **#${args.prNumber}** by @${args.senderLogin}: [${args.prTitle}](${args.prUrl})`,
+        });
+      }
+    } else if (args.event === "push") {
+      const commits = args.commits || [];
+      for (const commit of commits) {
+        const commitHash = commit.id?.substring(0, 7) || "";
+        const commitUrl = commit.url || "";
+        await ctx.db.insert("comments", {
+          orgId: issue.orgId,
+          issueId: issue._id,
+          authorId: issue.creatorId,
+          body: `🤖 **AI Semantic Link** (confidence: **${args.confidencePct}%**): Associated commit [${commitHash}](${commitUrl}) pushed by @${args.senderLogin}: _${commit.message.trim()}_`,
+        });
+      }
+    }
+  },
+});
+
+export const createSemanticSuggestionEvent = internalMutation({
+  args: {
+    orgId: v.id("organizations"),
+    issueId: v.id("issues"),
+    event: v.string(),
+    action: v.string(),
+    prUrl: v.string(),
+    prTitle: v.string(),
+    prNumber: v.number(),
+    senderLogin: v.string(),
+    confidencePct: v.number(),
+    commits: v.optional(
+      v.array(
+        v.object({
+          message: v.string(),
+          id: v.string(),
+          url: v.string(),
+        })
+      )
+    ),
+    merged: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const issue = await ctx.db.get(args.issueId);
+    if (!issue || issue.orgId !== args.orgId) {
+      console.warn(`Issue ${args.issueId} not found or mismatch org.`);
+      return;
+    }
+
+    const mentions = issue.assigneeId ? [issue.assigneeId] : [issue.creatorId];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let suggestionData: any = {};
+    let displayBody = "";
+
+    if (args.event === "pull_request") {
+      suggestionData = {
+        type: "link_pr",
+        prNumber: args.prNumber,
+        status: args.merged ? "merged" : args.action,
+        confidence: args.confidencePct,
+        prUrl: args.prUrl,
+        prTitle: args.prTitle,
+        senderLogin: args.senderLogin,
+      };
+      displayBody = `🤖 **AI Suggestion** (confidence: **${args.confidencePct}%**): Does this pull request belong here? **#${args.prNumber}** opened by @${args.senderLogin}: [${args.prTitle}](${args.prUrl})\n\n<!-- ${JSON.stringify({ aiSuggestion: suggestionData })} -->`;
+    } else if (args.event === "push") {
+      const commits = args.commits || [];
+      if (commits.length === 0) return;
+      const commit = commits[0];
+      const commitHash = commit.id?.substring(0, 7) || "";
+      suggestionData = {
+        type: "link_commit",
+        commitHash,
+        commitUrl: commit.url,
+        confidence: args.confidencePct,
+        senderLogin: args.senderLogin,
+        message: commit.message.trim(),
+      };
+      displayBody = `🤖 **AI Suggestion** (confidence: **${args.confidencePct}%**): Does this commit belong here? [${commitHash}](${commit.url}) pushed by @${args.senderLogin}: _${commit.message.trim()}_\n\n<!-- ${JSON.stringify({ aiSuggestion: suggestionData })} -->`;
+    }
+
+    if (displayBody) {
+      await ctx.db.insert("comments", {
+        orgId: issue.orgId,
+        issueId: issue._id,
+        authorId: issue.creatorId,
+        body: displayBody,
+        mentions,
+      });
+    }
   },
 });
