@@ -13,11 +13,22 @@ import {
   ExternalLink,
   MessageSquare,
   Send,
+  ChevronDown,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 
 interface GitHubRepo {
   id: number;
@@ -44,6 +55,7 @@ export default function IntegrationsSettingsPage() {
   const [reposError, setReposError] = useState<string | null>(null);
   const [selectedRepo, setSelectedRepo] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
   const [slackUrl, setSlackUrl] = useState("");
   const [savingSlack, setSavingSlack] = useState(false);
@@ -226,18 +238,54 @@ export default function IntegrationsSettingsPage() {
               </div>
             ) : (
               <div className="flex gap-2">
-                <select
-                  value={selectedRepo}
-                  onChange={(e) => setSelectedRepo(e.target.value)}
-                  className="flex-1 rounded-md border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                >
-                  <option value="">Select a repository...</option>
-                  {availableRepos.map((repo) => (
-                    <option key={repo.id} value={repo.fullName}>
-                      {repo.fullName} {repo.private ? "(Private)" : ""}
-                    </option>
-                  ))}
-                </select>
+                <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={popoverOpen}
+                      className="flex-grow justify-between text-xs h-8 px-3 font-normal max-w-[400px] bg-background border border-input"
+                    >
+                      <span className="truncate">
+                        {selectedRepo
+                          ? availableRepos.find((repo) => repo.fullName === selectedRepo)?.fullName || selectedRepo
+                          : "Select a repository..."}
+                      </span>
+                      <ChevronDown className="ml-2 size-3.5 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search repository..." className="h-8 text-xs" />
+                      <CommandList className="max-h-[200px]">
+                        <CommandEmpty className="text-xs py-2 text-center text-muted-foreground">No repository found.</CommandEmpty>
+                        <CommandGroup>
+                          {availableRepos.map((repo) => (
+                            <CommandItem
+                              key={repo.id}
+                              value={repo.fullName}
+                              onSelect={() => {
+                                setSelectedRepo(repo.fullName);
+                                setPopoverOpen(false);
+                              }}
+                              className="text-xs cursor-pointer"
+                            >
+                              <span className="truncate flex-grow text-left">
+                                {repo.fullName} {repo.private ? "(Private)" : ""}
+                              </span>
+                              <Check
+                                className={cn(
+                                  "ml-2 size-3.5 shrink-0",
+                                  selectedRepo === repo.fullName ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
                 <Button
                   size="sm"
                   className="h-8 gap-1.5 text-xs px-3"

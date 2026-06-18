@@ -131,6 +131,7 @@ export const listConnectedRepos = orgQuery({
   returns: v.array(
     v.object({
       _id: v.id("connectedRepos"),
+      _creationTime: v.number(),
       orgId: v.id("organizations"),
       repoName: v.string(),
       createdAt: v.number(),

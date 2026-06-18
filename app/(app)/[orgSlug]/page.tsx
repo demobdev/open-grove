@@ -1,9 +1,9 @@
 "use client";
 
-import { useAuth, useClerk } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { useMutation, useQuery, useAction } from "convex/react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -17,9 +17,30 @@ import {
   CheckCircle2,
   AlertCircle,
   FolderSync,
+  ExternalLink,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+
+/** Custom GitHub icon — lucide-react removed brand icons in v1 */
+function GitHubIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+    </svg>
+  );
+}
 
 interface GitHubRepo {
   id: number;
@@ -33,7 +54,7 @@ export default function WorkspaceHomePage() {
   const router = useRouter();
   const teams = useQuery(api.teams.list);
   const { has } = useAuth();
-  const clerk = useClerk();
+  const { user } = useUser();
   const isAdmin = has?.({ role: "org:admin" }) ?? false;
 
   const fetchUserRepos = useAction(api.githubConnection.listUserRepositories);
@@ -43,12 +64,34 @@ export default function WorkspaceHomePage() {
 
   const [seeding, setSeeding] = useState(false);
 
-  // Onboarding Wizard State
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [teamName, setTeamName] = useState("Engineering");
-  const [teamKey, setTeamKey] = useState("ENG");
+  // Onboarding Wizard State — restore from sessionStorage after GitHub OAuth redirect
+  const WIZARD_STORAGE_KEY = "opengrove_onboarding_wizard";
+
+  const getInitialWizardState = () => {
+    if (typeof window === "undefined") return { step: 1 as 1 | 2 | 3, teamName: "Engineering", teamKey: "ENG" };
+    try {
+      const saved = sessionStorage.getItem(WIZARD_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Clear it so we don't restore stale state on future visits
+        sessionStorage.removeItem(WIZARD_STORAGE_KEY);
+        return {
+          step: (parsed.step || 2) as 1 | 2 | 3,
+          teamName: parsed.teamName || "Engineering",
+          teamKey: parsed.teamKey || "ENG",
+        };
+      }
+    } catch { /* ignore parse errors */ }
+    return { step: 1 as 1 | 2 | 3, teamName: "Engineering", teamKey: "ENG" };
+  };
+
+  const [wizardInit] = useState(getInitialWizardState);
+  const [step, setStep] = useState<1 | 2 | 3>(wizardInit.step);
+  const [teamName, setTeamName] = useState(wizardInit.teamName);
+  const [teamKey, setTeamKey] = useState(wizardInit.teamKey);
   const [selectedRepo, setSelectedRepo] = useState("");
   const [importing, setImporting] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
   interface ImportIssue {
     title: string;
@@ -69,8 +112,14 @@ export default function WorkspaceHomePage() {
   const [githubRepos, setGithubRepos] = useState<GitHubRepo[]>([]);
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [reposError, setReposError] = useState<string | null>(null);
+  const [linkingGithub, setLinkingGithub] = useState(false);
 
-  const loadRepos = async () => {
+  // Check if GitHub is already linked via Clerk external accounts
+  const isGithubLinked = user?.externalAccounts?.some(
+    (account) => (account.provider as string) === "oauth_github" || (account.provider as string) === "github"
+  ) ?? false;
+
+  const loadRepos = useCallback(async () => {
     setLoadingRepos(true);
     setReposError(null);
     try {
@@ -86,6 +135,34 @@ export default function WorkspaceHomePage() {
     } finally {
       setLoadingRepos(false);
     }
+  }, [fetchUserRepos]);
+
+  /** Trigger Clerk's direct GitHub OAuth flow to link the account */
+  const handleLinkGithub = async () => {
+    if (!user) return;
+    setLinkingGithub(true);
+    try {
+      // Save wizard state so we resume at Step 2 after the OAuth redirect
+      sessionStorage.setItem(
+        WIZARD_STORAGE_KEY,
+        JSON.stringify({ step: 2, teamName, teamKey })
+      );
+
+      const externalAccount = await user.createExternalAccount({
+        strategy: "oauth_github",
+        redirectUrl: window.location.href,
+      });
+      // Clerk will redirect the user to GitHub — the verification URL
+      const verificationUrl = externalAccount.verification?.externalVerificationRedirectURL;
+      if (verificationUrl) {
+        window.location.href = verificationUrl.toString();
+      }
+    } catch (err) {
+      console.error("GitHub linking failed:", err);
+      toast.error("Failed to start GitHub connection. Please try again.");
+      sessionStorage.removeItem(WIZARD_STORAGE_KEY);
+      setLinkingGithub(false);
+    }
   };
 
   useEffect(() => {
@@ -96,11 +173,16 @@ export default function WorkspaceHomePage() {
 
   useEffect(() => {
     if (step === 2 && githubRepos.length === 0 && !loadingRepos) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadRepos();
+      if (isGithubLinked) {
+        // GitHub is already connected — fetch their repos
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        loadRepos();
+      } else {
+        // Not linked yet — show the connect prompt immediately (no spinner)
+        setReposError("not_linked");
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  }, [step, githubRepos.length, loadingRepos, loadRepos, isGithubLinked]);
 
   const handleProceedToStep3 = async () => {
     if (!selectedRepo) {
@@ -277,19 +359,31 @@ export default function WorkspaceHomePage() {
                       Fetching your repositories...
                     </div>
                   ) : reposError === "not_linked" ? (
-                    <div className="rounded-lg border border-dashed p-4 bg-muted/10 space-y-3">
-                      <div className="flex gap-2 text-xs text-muted-foreground">
-                        <AlertCircle className="size-4 shrink-0 text-amber-500" />
-                        <p>
-                          Your GitHub profile is not linked to your account. Click the button below to open your profile settings and connect GitHub under <strong>Social accounts</strong>.
+                    <div className="rounded-lg border border-dashed p-5 bg-muted/10 space-y-4">
+                      <div className="flex flex-col items-center text-center gap-2">
+                        <div className="rounded-full bg-amber-500/10 p-2.5">
+                          <GitHubIcon className="size-5 text-amber-500" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground">Connect your GitHub account</p>
+                        <p className="text-xs text-muted-foreground max-w-xs">
+                          Link your GitHub account to browse repositories and import issues. You&apos;ll be redirected to GitHub to authorize access.
                         </p>
                       </div>
-                      <Button onClick={() => clerk.openUserProfile()} className="w-full text-xs h-9 gap-1.5">
-                        <GitBranch className="size-3.5" />
-                        Connect GitHub Account
+                      <Button
+                        onClick={handleLinkGithub}
+                        disabled={linkingGithub}
+                        className="w-full text-xs h-9 gap-1.5"
+                      >
+                        {linkingGithub ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <GitHubIcon className="size-3.5" />
+                        )}
+                        {linkingGithub ? "Redirecting to GitHub..." : "Authorize GitHub"}
+                        {!linkingGithub && <ExternalLink className="size-3 ml-0.5 opacity-60" />}
                       </Button>
                       <Button onClick={loadRepos} variant="outline" className="w-full text-xs h-8">
-                        Refresh Repositories list
+                        I&apos;ve already connected — refresh
                       </Button>
                     </div>
                   ) : reposError ? (
@@ -299,20 +393,56 @@ export default function WorkspaceHomePage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <div className="space-y-2">
+                      <div className="space-y-2 flex flex-col">
                         <label className="text-xs font-semibold text-foreground">Select Repository</label>
-                        <select
-                          value={selectedRepo}
-                          onChange={(e) => setSelectedRepo(e.target.value)}
-                          className="w-full rounded-md border bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                        >
-                          <option value="">Choose a repository...</option>
-                          {githubRepos.map((repo) => (
-                            <option key={repo.id} value={repo.fullName}>
-                              {repo.fullName} {repo.private ? "(Private)" : ""}
-                            </option>
-                          ))}
-                        </select>
+                        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={popoverOpen}
+                              className="w-full justify-between text-xs h-9 px-3 font-normal"
+                            >
+                              <span className="truncate">
+                                {selectedRepo
+                                  ? githubRepos.find((repo) => repo.fullName === selectedRepo)?.fullName || selectedRepo
+                                  : "Choose a repository..."}
+                              </span>
+                              <ChevronDown className="ml-2 size-3.5 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Search repository..." className="h-8 text-xs" />
+                              <CommandList className="max-h-[200px]">
+                                <CommandEmpty className="text-xs py-2 text-center text-muted-foreground">No repository found.</CommandEmpty>
+                                <CommandGroup>
+                                  {githubRepos.map((repo) => (
+                                    <CommandItem
+                                      key={repo.id}
+                                      value={repo.fullName}
+                                      onSelect={() => {
+                                        setSelectedRepo(repo.fullName);
+                                        setPopoverOpen(false);
+                                      }}
+                                      className="text-xs cursor-pointer"
+                                    >
+                                      <span className="truncate flex-grow text-left">
+                                        {repo.fullName} {repo.private ? "(Private)" : ""}
+                                      </span>
+                                      <Check
+                                        className={cn(
+                                          "ml-2 size-3.5 shrink-0",
+                                          selectedRepo === repo.fullName ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       
                       <div className="flex gap-2 pt-2">
