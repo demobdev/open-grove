@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import { useMutation, useQuery, useAction } from "convex/react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -33,6 +33,7 @@ export default function WorkspaceHomePage() {
   const router = useRouter();
   const teams = useQuery(api.teams.list);
   const { has } = useAuth();
+  const clerk = useClerk();
   const isAdmin = has?.({ role: "org:admin" }) ?? false;
 
   const fetchUserRepos = useAction(api.githubConnection.listUserRepositories);
@@ -280,10 +281,13 @@ export default function WorkspaceHomePage() {
                       <div className="flex gap-2 text-xs text-muted-foreground">
                         <AlertCircle className="size-4 shrink-0 text-amber-500" />
                         <p>
-                          Your GitHub profile is not linked to your account.
-                          Click your avatar in the bottom-left sidebar, go to <strong>Manage Account</strong>, and link <strong>GitHub</strong> under <strong>Social accounts</strong>.
+                          Your GitHub profile is not linked to your account. Click the button below to open your profile settings and connect GitHub under <strong>Social accounts</strong>.
                         </p>
                       </div>
+                      <Button onClick={() => clerk.openUserProfile()} className="w-full text-xs h-9 gap-1.5">
+                        <GitBranch className="size-3.5" />
+                        Connect GitHub Account
+                      </Button>
                       <Button onClick={loadRepos} variant="outline" className="w-full text-xs h-8">
                         Refresh Repositories list
                       </Button>
