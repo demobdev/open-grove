@@ -1,6 +1,6 @@
 "use client";
 
-import { useOrganizationList } from "@clerk/nextjs";
+import { useOrganization, useOrganizationList } from "@clerk/nextjs";
 import { useQuery } from "convex/react";
 import { Loader2, Menu, X } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
@@ -42,6 +42,7 @@ export function WorkspaceShell({
     setSidebarOpen(false);
   }, [pathname]);
 
+  const { organization: activeOrg } = useOrganization();
   const { isLoaded, setActive, userMemberships } = useOrganizationList({
     userMemberships: { infinite: true },
   });
@@ -55,15 +56,16 @@ export function WorkspaceShell({
     if (!isLoaded) {
       return;
     }
-    if (targetMembership) {
+    if (targetMembership && activeOrg?.id !== targetMembership.organization.id) {
       void setActive({ organization: targetMembership.organization.id });
-    } else if (!userMemberships.isLoading && !userMemberships.hasNextPage) {
+    } else if (!targetMembership && !userMemberships.isLoading && !userMemberships.hasNextPage) {
       // The user doesn't belong to an org with this slug.
       router.replace("/onboarding");
     }
   }, [
     isLoaded,
     targetMembership,
+    activeOrg?.id,
     userMemberships.isLoading,
     userMemberships.hasNextPage,
     setActive,
