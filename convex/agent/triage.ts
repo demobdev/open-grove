@@ -200,7 +200,7 @@ export const suggestTriage = action({
         priority: PRIORITIES.includes(output.priority)
           ? output.priority
           : ("none" as const),
-        labels,
+        labels: labels as any,
         reasoning: output.reasoning,
       };
     } catch (error) {
