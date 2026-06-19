@@ -87,7 +87,7 @@ function ProjectsPageInner() {
             <span className="hidden w-14 text-right lg:block">Target</span>
             <span className="w-5 text-right">Lead</span>
           </div>
-          {projects.map((project) => (
+          {projects.map((project: any) => (
             <ProjectRow key={project._id} project={project} />
           ))}
         </ScrollArea>

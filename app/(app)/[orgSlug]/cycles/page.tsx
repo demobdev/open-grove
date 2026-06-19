@@ -57,8 +57,8 @@ function CyclesPageInner() {
   };
 
   const loading = cycles === undefined || teams === undefined;
-  const teamsWithCycles = teams?.filter((team) =>
-    cycles?.some((cycle) => cycle.teamId === team._id)
+  const teamsWithCycles = teams?.filter((team: any) =>
+    cycles?.some((cycle: any) => cycle.teamId === team._id)
   );
 
   return (
@@ -109,7 +109,7 @@ function CyclesPageInner() {
         </div>
       ) : (
         <ScrollArea className="flex-1">
-          {teamsWithCycles?.map((team) => (
+          {teamsWithCycles?.map((team: any) => (
             <section key={team._id}>
               <div className="flex h-9 items-center gap-2 bg-muted/50 px-4 text-sm">
                 <span className="flex size-4 items-center justify-center rounded bg-primary/15 text-[9px] font-semibold text-primary">
@@ -117,7 +117,7 @@ function CyclesPageInner() {
                 </span>
                 <span className="font-medium">{team.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  {cycles.filter((cycle) => cycle.teamId === team._id).length}
+                  {cycles.filter((cycle: any) => cycle.teamId === team._id).length}
                 </span>
                 <Button
                   variant="ghost"
@@ -130,8 +130,8 @@ function CyclesPageInner() {
                 </Button>
               </div>
               {cycles
-                .filter((cycle) => cycle.teamId === team._id)
-                .map((cycle) => (
+                .filter((cycle: any) => cycle.teamId === team._id)
+                .map((cycle: any) => (
                   <CycleRow key={cycle._id} cycle={cycle} />
                 ))}
             </section>
