@@ -19,9 +19,9 @@ export function FeaturesAi() {
             Included in Pro & Enterprise
           </div>
           <SectionHeading
-            eyebrow="04 · AI Agent"
-            title="An agent that understands the work"
-            lede="OpenGrove’s agent reads your issues, cycles, projects, and GitHub activity with org-scoped permissions — so it can summarize what shipped, spot risk, create follow-up issues, and keep the team moving."
+            eyebrow="04 · The Org Brain"
+            title="Built for non-human identities"
+            lede="OpenGrove isn't just an issue tracker—it's an orchestration layer built for infinite parallelism. Agents read your issues, cycles, and skills with scoped permissions, allowing hundreds of autonomous workflows to run concurrently without stepping on each other's toes."
           />
           <div className="mt-10 grid gap-7 sm:grid-cols-2">
             <FeatureBullet

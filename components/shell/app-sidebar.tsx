@@ -6,11 +6,14 @@ import {
   Bell,
   Bot,
   Box,
+  Brain,
   ChevronDown,
   Plus,
   RefreshCcw,
   Search,
   SquarePen,
+  Zap,
+  Repeat,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
@@ -28,6 +31,7 @@ import { useCommands } from "@/components/commands/command-provider";
 import { CreateTeamDialog } from "@/components/teams/create-team-dialog";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
+import { HelpDialog } from "./help-dialog";
 
 function NavLink({
   href,
@@ -127,6 +131,15 @@ export function AppSidebar() {
           <NavLink href={`${base}/ai`} icon={<Bot className="size-4" />}>
             AI Agent
           </NavLink>
+          <NavLink href={`${base}/skills`} icon={<Brain className="size-4" />}>
+            Skills Registry
+          </NavLink>
+          <NavLink href={`${base}/automations`} icon={<Zap className="size-4" />}>
+            Automations
+          </NavLink>
+          <NavLink href={`${base}/loops`} icon={<Repeat className="size-4" />}>
+            Loops Dashboard
+          </NavLink>
         </nav>
 
         <Collapsible defaultOpen className="pb-4">
@@ -135,15 +148,20 @@ export function AppSidebar() {
               Your teams
               <ChevronDown className="size-3" />
             </CollapsibleTrigger>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-5"
-              onClick={() => setCreateTeamOpen(true)}
-              aria-label="Create team"
-            >
-              <Plus className="size-3.5" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-5"
+                  onClick={() => setCreateTeamOpen(true)}
+                  aria-label="Create team"
+                >
+                  <Plus className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Create Team</TooltipContent>
+            </Tooltip>
           </div>
           <CollapsibleContent className="flex flex-col gap-0.5 pt-1">
             {teams?.map((team) => (
@@ -173,7 +191,10 @@ export function AppSidebar() {
       </ScrollArea>
 
       <div className="flex items-center justify-between border-t p-3">
-        <UserButton />
+        <div className="flex items-center gap-2">
+          <UserButton />
+          <HelpDialog />
+        </div>
         <ThemeToggle />
       </div>
 

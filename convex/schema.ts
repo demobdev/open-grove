@@ -49,6 +49,43 @@ export const issueRelationTypeValidator = v.union(
   v.literal("duplicate_of")
 );
 
+// ── Agentic Execution Layer validators ───────────────────────────────────
+
+export const skillTypeValidator = v.union(
+  v.literal("triage"),
+  v.literal("review"),
+  v.literal("docs"),
+  v.literal("security"),
+  v.literal("style"),
+  v.literal("release"),
+  v.literal("custom")
+);
+
+export const agentTriggerTypeValidator = v.union(
+  v.literal("manual"),
+  v.literal("github_pr_opened"),
+  v.literal("github_pr_merged"),
+  v.literal("github_push"),
+  v.literal("cron"),
+  v.literal("issue_created"),
+  v.literal("issue_status_changed")
+);
+
+export const executionModeValidator = v.union(
+  v.literal("suggest_only"),
+  v.literal("draft"),
+  v.literal("auto_execute")
+);
+
+export const agentRunStatusValidator = v.union(
+  v.literal("queued"),
+  v.literal("running"),
+  v.literal("needs_approval"),
+  v.literal("succeeded"),
+  v.literal("failed"),
+  v.literal("cancelled")
+);
+
 export default defineSchema({
   // ── Synced from Clerk via webhooks ─────────────────────────────────────
   users: defineTable({
@@ -232,4 +269,139 @@ export default defineSchema({
   })
     .index("by_org", ["orgId"])
     .index("by_repo", ["repoName"]),
+
+  // ── Agentic Execution Layer (Phase 1 & 2) ──────────────────────────────────
+
+  /**
+   * Automations — the "If This Then That" engine.
+   * Maps an event trigger (e.g., github_pr_opened) to a target skill.
+   */
+  automations: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    triggerType: agentTriggerTypeValidator,
+    triggerConfig: v.optional(v.string()), // e.g. cron schedule
+    targetSkillId: v.optional(v.id("skills")),
+    targetLoopId: v.optional(v.id("loops")),
+    executionMode: executionModeValidator,
+    isEnabled: v.boolean(),
+    createdBy: v.id("users"),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_and_trigger", ["orgId", "triggerType"]),
+
+  loops: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    actionSkillId: v.id("skills"),
+    validationSkillId: v.id("skills"),
+    maxIterations: v.number(),
+    isEnabled: v.boolean(),
+    createdBy: v.id("users"),
+    updatedAt: v.number(),
+  }).index("by_org", ["orgId"]),
+
+  /**
+   * Skills Registry — the "Org Brain".
+   * Structured, scoped, versioned prompt templates and quality gates
+   * that agents discover at runtime based on task context.
+   */
+  skills: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    /** URL-safe identifier, e.g. "auto-review-v1" */
+    slug: v.string(),
+    description: v.optional(v.string()),
+    type: skillTypeValidator,
+    /** Scope controls where this skill applies */
+    scope: v.object({
+      repoNames: v.optional(v.array(v.string())),
+      teamIds: v.optional(v.array(v.id("teams"))),
+      projectIds: v.optional(v.array(v.id("projects"))),
+      fileGlobs: v.optional(v.array(v.string())),
+    }),
+    /** The actual prompt template / instructions content */
+    content: v.string(),
+    /** Quality gates — structured checks the agent must verify */
+    qualityGates: v.optional(v.array(v.string())),
+    /** Higher priority skills take precedence when multiple match */
+    priority: v.number(),
+    isEnabled: v.boolean(),
+    version: v.number(),
+    createdBy: v.id("users"),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_and_slug", ["orgId", "slug"])
+    .index("by_org_and_type", ["orgId", "type"]),
+
+  /**
+   * API Keys — secure external access for local agents (Cursor, Claude Code, etc.).
+   * Keys are hashed; only the prefix is stored in cleartext for identification.
+   */
+  apiKeys: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    /** First 8 chars of the key for display, e.g. "og_abc123..." */
+    prefix: v.string(),
+    /** SHA-256 hash of the full key */
+    keyHash: v.string(),
+    scopes: v.array(v.string()),
+    createdBy: v.id("users"),
+    lastUsedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_key_hash", ["keyHash"]),
+
+  /**
+   * Agent Runs — durable execution ledger.
+   * Every automation, loop, and manual agent action is recorded here.
+   * Powers the Loops Dashboard, debugging, auditability, billing, and trust.
+   */
+  agentRuns: defineTable({
+    orgId: v.id("organizations"),
+    teamId: v.optional(v.id("teams")),
+    issueId: v.optional(v.id("issues")),
+    automationId: v.optional(v.id("automations")),
+    loopId: v.optional(v.id("loops")),
+    skillIds: v.array(v.id("skills")),
+    triggerType: agentTriggerTypeValidator,
+    executionMode: executionModeValidator,
+    status: agentRunStatusValidator,
+    /** Idempotency key to prevent duplicate runs */
+    idempotencyKey: v.optional(v.string()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    summary: v.optional(v.string()),
+    error: v.optional(v.string()),
+    createdByUserId: v.optional(v.id("users")),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_and_status", ["orgId", "status"])
+    .index("by_idempotency", ["orgId", "idempotencyKey"]),
+
+  /**
+   * Agent Run Steps — step-level logging for each tool call in a run.
+   * Shows what the agent did, in what order, and whether each step succeeded.
+   */
+  agentRunSteps: defineTable({
+    runId: v.id("agentRuns"),
+    stepIndex: v.number(),
+    toolName: v.string(),
+    input: v.optional(v.string()),
+    outputSummary: v.optional(v.string()),
+    status: v.union(
+      v.literal("running"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("skipped")
+    ),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    error: v.optional(v.string()),
+  }).index("by_run", ["runId"]),
 });

@@ -63,18 +63,61 @@ export const handleGithubEvent = internalMutation({
       senderLogin = body.pusher?.name || "GitHub";
     }
     
+    const repoFullName = body.repository?.full_name || "";
+    if (!repoFullName) return { processed: 0, reason: "No repository in payload" };
+
+    const connections = await ctx.db
+      .query("connectedRepos")
+      .withIndex("by_repo", (q) => q.eq("repoName", repoFullName))
+      .collect();
+    
+    if (connections.length === 0) {
+      return { processed: 0, reason: "Repository not connected to any organization" };
+    }
+
+    // ── AUTOMATIONS TRIGGER (Phase 2) ──
+    let triggerType: "github_pr_opened" | "github_pr_merged" | "github_push" | null = null;
+    if (args.event === "pull_request" && (action === "opened" || action === "reopened")) {
+      triggerType = "github_pr_opened";
+    } else if (args.event === "pull_request" && action === "closed" && body.pull_request?.merged) {
+      triggerType = "github_pr_merged";
+    } else if (args.event === "push") {
+      triggerType = "github_push";
+    }
+
+    for (const conn of connections) {
+      if (triggerType) {
+        const automations = await ctx.db
+          .query("automations")
+          .withIndex("by_org_and_trigger", (q) => 
+            q.eq("orgId", conn.orgId).eq("triggerType", triggerType!)
+          )
+          .collect();
+          
+        const activeAutomations = automations.filter(a => a.isEnabled);
+        
+        for (const automation of activeAutomations) {
+          // Record the execution in the agentRuns ledger
+          await ctx.db.insert("agentRuns", {
+            orgId: conn.orgId,
+            automationId: automation._id,
+            skillIds: automation.targetSkillId ? [automation.targetSkillId] : [],
+            loopId: automation.targetLoopId,
+            triggerType: triggerType,
+            executionMode: automation.executionMode,
+            status: "queued",
+            summary: `Triggered by ${triggerType} on ${repoFullName}`,
+            startedAt: Date.now(),
+          });
+          
+          // In Phase 3 (Loops), this is where we actually schedule the background action
+          // to spawn the LLM loop. For now, it just queues it in the ledger.
+        }
+      }
+    }
+
     const issueKeys = extractIssueKeys(textToScan);
     if (issueKeys.length === 0) {
-      const repoFullName = body.repository?.full_name || "";
-      const connections = await ctx.db
-        .query("connectedRepos")
-        .withIndex("by_repo", (q) => q.eq("repoName", repoFullName))
-        .collect();
-      
-      if (connections.length === 0) {
-        return { processed: 0, reason: "Repository not connected to any organization" };
-      }
-      
       // For each connection, schedule the semantic link background action
       for (const conn of connections) {
         await ctx.scheduler.runAfter(0, internal.github.handleSemanticGithubEvent, {

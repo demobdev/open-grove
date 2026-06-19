@@ -1,7 +1,7 @@
 import { httpRouter } from "convex/server";
 import { Webhook } from "svix";
 import { internal } from "./_generated/api";
-import { httpAction } from "./_generated/server";
+import { httpAction, ActionCtx } from "./_generated/server";
 
 const http = httpRouter();
 
@@ -114,4 +114,78 @@ http.route({
   }),
 });
 
+// ── External API (Phase 1) ────────────────────────────────────────────────
+
+/**
+ * Helper to securely verify an API key from the Authorization header.
+ * Expected format: "Bearer og_abcdef123..."
+ */
+async function verifyApiKey(ctx: ActionCtx, request: Request, requiredScope?: string) {
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return { error: "Missing or invalid Authorization header", status: 401 };
+  }
+
+  const rawKey = authHeader.substring(7);
+  
+  // Hash the raw key provided by the client
+  const encoder = new TextEncoder();
+  const data = encoder.encode(rawKey);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const keyHash = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+
+  // Look up the key by hash
+  const apiKey = await ctx.runQuery(internal.apiKeys.internalGetByKeyHash, { keyHash });
+  if (!apiKey || apiKey.revokedAt) {
+    return { error: "Invalid or revoked API key", status: 401 };
+  }
+
+  // Enforce scopes if requested
+  if (requiredScope && !apiKey.scopes.includes(requiredScope) && !apiKey.scopes.includes("all")) {
+    return { error: `Missing required scope: ${requiredScope}`, status: 403 };
+  }
+
+  // Update last used timestamp in the background
+  await ctx.runMutation(internal.apiKeys.internalUpdateLastUsed, { apiKeyId: apiKey._id });
+
+  return { apiKey };
+}
+
+/**
+ * GET /api/skills
+ * 
+ * The external Skills API for Cursor, Claude Code, and local scripts.
+ * Returns the active skills for the organization.
+ */
+http.route({
+  path: "/api/skills",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const auth = await verifyApiKey(ctx, request, "skills:read");
+    if (auth.error || !auth.apiKey) {
+      return new Response(JSON.stringify({ error: auth.error || "Unauthorized" }), {
+        status: auth.status,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const orgId = auth.apiKey.orgId;
+
+    // Optional query parameters for scoping
+    const url = new URL(request.url);
+    const _repo = url.searchParams.get("repo") || undefined;
+    
+    // In a real implementation we would filter by repo/team scope here.
+    // For now, we return all active skills for the org.
+    const skills = await ctx.runQuery(internal.skills.internalListActiveSkills, { orgId });
+
+    return new Response(JSON.stringify({ skills }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }),
+});
+
 export default http;
+

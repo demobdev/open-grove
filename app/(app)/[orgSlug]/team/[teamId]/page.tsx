@@ -83,10 +83,57 @@ export default function TeamIssuesPage() {
       </header>
       <ScrollArea className="flex-1">
         {issues.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-32 text-center">
-            <p className="text-sm text-muted-foreground">
-              No issues yet. Press <kbd className="rounded border bg-muted px-1 font-mono text-xs">C</kbd> to create one.
-            </p>
+          <div className="flex flex-col items-center justify-center py-20 px-4">
+            <div className="w-full max-w-md space-y-6">
+              <div className="text-center space-y-2">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-4">
+                  <List className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold tracking-tight text-foreground">Welcome to OpenGrove</h3>
+                <p className="text-sm text-muted-foreground text-balance">
+                  Your orchestration layer is ready. Follow these steps to set up your automated workspace.
+                </p>
+              </div>
+              
+              <div className="rounded-xl border bg-card shadow-sm">
+                <div className="flex items-start gap-4 border-b p-4">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-primary text-xs font-medium text-primary">1</div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-medium leading-none">Create your first issue</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Press <kbd className="pointer-events-none mx-1 inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">⌘K</kbd> anywhere to open the command palette, or press <kbd className="pointer-events-none mx-1 inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">C</kbd>
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4 border-b p-4">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-primary text-xs font-medium text-primary">2</div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-medium leading-none">Connect GitHub</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Link your repositories in <a href={`/${params.orgSlug}/settings/integrations`} className="font-medium text-primary hover:underline">Integrations</a> so issues automatically transition when PRs open.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-4 p-4">
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-primary text-xs font-medium text-primary">3</div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-medium leading-none">Define an AI Skill</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Visit the <a href={`/${params.orgSlug}/skills`} className="font-medium text-primary hover:underline">Skills Registry</a> to teach your agents about your codebase rules.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-center">
+                <Button onClick={openCreateIssue} className="shadow-sm">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Issue
+                </Button>
+              </div>
+            </div>
           </div>
         ) : (
           grouped.map(({ status, issues: groupIssues }) => (

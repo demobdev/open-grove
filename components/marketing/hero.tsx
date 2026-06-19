@@ -34,9 +34,9 @@ export function Hero() {
           The issue tracker built for speed
         </h1>
         <p className="mt-6 max-w-xl text-base text-balance text-muted-foreground md:text-lg">
-          Plan work, ship code, and let OpenGrove keep the board in sync — with
-          keyboard-first issues, live cycles, semantic PR linking, and an AI agent
-          that handles the busywork.
+          Plan work, ship code, and let OpenGrove keep the board in sync. Designed for 
+          infinite parallelism and non-human identities — an issue tracker that acts as 
+          the orchestration layer for all your AI agents.
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">

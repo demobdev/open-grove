@@ -6,6 +6,7 @@ import { FeaturesBoard } from "@/components/marketing/features-board";
 import { FeaturesGithub } from "@/components/marketing/features-github";
 import { FeaturesIssues } from "@/components/marketing/features-issues";
 import { FeaturesKeyboard } from "@/components/marketing/features-keyboard";
+import { FeaturesSecurity } from "@/components/marketing/features-security";
 import { Footer } from "@/components/marketing/footer";
 import { Hero } from "@/components/marketing/hero";
 import { LogoCloud } from "@/components/marketing/logo-cloud";
@@ -27,6 +28,7 @@ export default function LandingPage() {
         <FeaturesBoard />
         <FeaturesGithub />
         <FeaturesAi />
+        <FeaturesSecurity />
         <FeaturesKeyboard />
         <FeatureGrid />
         <Testimonials />

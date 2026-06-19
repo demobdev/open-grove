@@ -1,6 +1,6 @@
 "use client";
 
-import { CreditCard, Users, GitBranch } from "lucide-react";
+import { CreditCard, Users, GitBranch, KeyRound } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ const SETTINGS_PAGES = [
   { label: "Billing", segment: "billing", icon: CreditCard },
   { label: "Members", segment: "members", icon: Users },
   { label: "Integrations", segment: "integrations", icon: GitBranch },
+  { label: "API Keys", segment: "api-keys", icon: KeyRound },
 ] as const;
 
 /** Left-hand navigation for the workspace settings section. */

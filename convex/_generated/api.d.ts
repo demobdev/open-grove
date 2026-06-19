@@ -9,6 +9,7 @@
  */
 
 import type * as activity from "../activity.js";
+import type * as agentRuns from "../agentRuns.js";
 import type * as agent_chat from "../agent/chat.js";
 import type * as agent_data from "../agent/data.js";
 import type * as agent_embeddings from "../agent/embeddings.js";
@@ -17,7 +18,9 @@ import type * as agent_models from "../agent/models.js";
 import type * as agent_tools from "../agent/tools.js";
 import type * as agent_triage from "../agent/triage.js";
 import type * as agent_vectorAgent from "../agent/vectorAgent.js";
+import type * as apiKeys from "../apiKeys.js";
 import type * as attachments from "../attachments.js";
+import type * as automations from "../automations.js";
 import type * as comments from "../comments.js";
 import type * as cycles from "../cycles.js";
 import type * as github from "../github.js";
@@ -31,11 +34,13 @@ import type * as lib_activity from "../lib/activity.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
 import type * as lib_limits from "../lib/limits.js";
+import type * as loops from "../loops.js";
 import type * as organizations from "../organizations.js";
 import type * as presenceFns from "../presenceFns.js";
 import type * as projects from "../projects.js";
 import type * as search from "../search.js";
 import type * as seed from "../seed.js";
+import type * as skills from "../skills.js";
 import type * as slack from "../slack.js";
 import type * as teams from "../teams.js";
 import type * as users from "../users.js";
@@ -50,6 +55,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   activity: typeof activity;
+  agentRuns: typeof agentRuns;
   "agent/chat": typeof agent_chat;
   "agent/data": typeof agent_data;
   "agent/embeddings": typeof agent_embeddings;
@@ -58,7 +64,9 @@ declare const fullApi: ApiFromModules<{
   "agent/tools": typeof agent_tools;
   "agent/triage": typeof agent_triage;
   "agent/vectorAgent": typeof agent_vectorAgent;
+  apiKeys: typeof apiKeys;
   attachments: typeof attachments;
+  automations: typeof automations;
   comments: typeof comments;
   cycles: typeof cycles;
   github: typeof github;
@@ -72,11 +80,13 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/customFunctions": typeof lib_customFunctions;
   "lib/limits": typeof lib_limits;
+  loops: typeof loops;
   organizations: typeof organizations;
   presenceFns: typeof presenceFns;
   projects: typeof projects;
   search: typeof search;
   seed: typeof seed;
+  skills: typeof skills;
   slack: typeof slack;
   teams: typeof teams;
   users: typeof users;
