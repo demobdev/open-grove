@@ -187,5 +187,78 @@ http.route({
   }),
 });
 
+/**
+ * GET /api/context
+ * 
+ * The external Context API for Cursor, Claude Code, and local scripts.
+ * Returns the active skills and specific issue context for the organization.
+ */
+http.route({
+  path: "/api/context",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const auth = await verifyApiKey(ctx, request);
+    if (auth.error || !auth.apiKey) {
+      return new Response(JSON.stringify({ error: auth.error || "Unauthorized" }), {
+        status: auth.status,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const apiKey = auth.apiKey;
+    
+    // Enforce required scopes
+    const hasReadSkills = apiKey.scopes.includes("skills:read") || apiKey.scopes.includes("all");
+    const hasReadIssues = apiKey.scopes.includes("issues:read") || apiKey.scopes.includes("all");
+    
+    if (!hasReadSkills && !hasReadIssues) {
+      return new Response(JSON.stringify({ error: "Missing required scopes" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const orgId = apiKey.orgId;
+
+    const url = new URL(request.url);
+    const issueKey = url.searchParams.get("issueKey");
+    const repo = url.searchParams.get("repo");
+    
+    let skillsResponse = undefined;
+    if (hasReadSkills) {
+      skillsResponse = await ctx.runQuery(internal.skills.internalListActiveSkills, { orgId });
+    }
+
+    let issueResponse = undefined;
+    if (hasReadIssues && issueKey) {
+      const issue = await ctx.runQuery(internal.issues.internalGetIssueByKey, { 
+        orgId, 
+        issueKey 
+      });
+      if (issue) {
+        issueResponse = {
+          key: issueKey.toUpperCase(),
+          title: issue.title,
+          description: issue.description,
+          status: issue.status,
+          priority: issue.priority,
+        };
+      }
+    }
+
+    const responsePayload = {
+      org: orgId,
+      repo: repo || undefined,
+      skills: skillsResponse,
+      issue: issueResponse,
+    };
+
+    return new Response(JSON.stringify(responsePayload), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }),
+});
+
 export default http;
 

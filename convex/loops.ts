@@ -115,3 +115,14 @@ export const deleteLoop = orgMutation({
     await ctx.db.delete(args.loopId);
   },
 });
+
+export const listRuns = orgQuery({
+  args: { loopId: v.id("loops") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("loopRuns")
+      .withIndex("by_loop", (q) => q.eq("loopId", args.loopId))
+      .order("desc")
+      .collect();
+  },
+});

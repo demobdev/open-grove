@@ -14,6 +14,7 @@ import {
   SquarePen,
   Zap,
   Repeat,
+  GitMerge,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
@@ -38,11 +39,13 @@ function NavLink({
   icon,
   children,
   exact = false,
+  trailing,
 }: {
   href: string;
   icon: ReactNode;
   children: ReactNode;
   exact?: boolean;
+  trailing?: ReactNode;
 }) {
   const pathname = usePathname();
   const active = exact ? pathname === href : pathname.startsWith(href);
@@ -54,8 +57,11 @@ function NavLink({
         active && "bg-accent text-foreground"
       )}
     >
-      {icon}
-      <span className="truncate">{children}</span>
+      <div className="flex items-center gap-2 overflow-hidden flex-1">
+        {icon}
+        <span className="truncate">{children}</span>
+      </div>
+      {trailing}
     </Link>
   );
 }
@@ -63,6 +69,7 @@ function NavLink({
 export function AppSidebar() {
   const params = useParams<{ orgSlug: string }>();
   const teams = useQuery(api.teams.list);
+  const aiBadgeCount = useQuery(api.aiSuggestions.getBadgeCount);
   const { openCreateIssue, openPalette } = useCommands();
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const base = `/${params.orgSlug}`;
@@ -115,7 +122,17 @@ export function AppSidebar() {
           <NavLink href={base} exact icon={<Box className="size-4" />}>
             Workspace
           </NavLink>
-          <NavLink href={`${base}/inbox`} icon={<Bell className="size-4" />}>
+          <NavLink 
+            href={`${base}/inbox`} 
+            icon={<Bell className="size-4" />}
+            trailing={
+              aiBadgeCount ? (
+                <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                  {aiBadgeCount}
+                </span>
+              ) : null
+            }
+          >
             Inbox
           </NavLink>
           {/* Track B adds /projects + /cycles nav; Track D adds /ai nav */}
@@ -139,6 +156,9 @@ export function AppSidebar() {
           </NavLink>
           <NavLink href={`${base}/loops`} icon={<Repeat className="size-4" />}>
             Loops Dashboard
+          </NavLink>
+          <NavLink href={`${base}/merge-queue`} icon={<GitMerge className="size-4" />}>
+            Merge Queue
           </NavLink>
         </nav>
 

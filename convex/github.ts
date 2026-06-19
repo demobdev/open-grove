@@ -5,6 +5,7 @@ import { internal } from "./_generated/api";
 import { hasAiAccess } from "./lib/limits";
 import { embedText } from "./agent/embeddings";
 import { isAiConfigured } from "./agent/models";
+import { GITHUB_CONFIG } from "./lib/githubConfig";
 
 // Extract unique issue keys like "ENG-12" from text
 function extractIssueKeys(text: string): { key: string; number: number }[] {
@@ -73,6 +74,43 @@ export const handleGithubEvent = internalMutation({
     
     if (connections.length === 0) {
       return { processed: 0, reason: "Repository not connected to any organization" };
+    }
+
+    // ── MERGE QUEUE TRIGGER (Phase 6) ──
+    if (args.event === "check_run") {
+      const branchName = body.check_run?.check_suite?.head_branch;
+      if (branchName && branchName.startsWith("og-merge-batch-")) {
+        const conclusion = body.check_run?.conclusion;
+        if (conclusion === "success" || conclusion === "failure" || conclusion === "cancelled") {
+          const status = conclusion === "success" ? "success" : "failure";
+          for (const conn of connections) {
+            await ctx.scheduler.runAfter(0, internal.mergeQueue.handleBatchStatus, {
+              orgId: conn.orgId,
+              repoId: repoFullName,
+              branchName,
+              status,
+            });
+          }
+        }
+        return { processed: 1, reason: "Processed check_run for merge batch" };
+      }
+    } else if (args.event === "status") {
+      const branchName = body.branches?.[0]?.name;
+      if (branchName && branchName.startsWith("og-merge-batch-")) {
+        const state = body.state; // success, failure, error
+        if (state === "success" || state === "failure" || state === "error") {
+          const status = state === "success" ? "success" : "failure";
+          for (const conn of connections) {
+            await ctx.scheduler.runAfter(0, internal.mergeQueue.handleBatchStatus, {
+              orgId: conn.orgId,
+              repoId: repoFullName,
+              branchName,
+              status,
+            });
+          }
+        }
+        return { processed: 1, reason: "Processed status for merge batch" };
+      }
     }
 
     // ── AUTOMATIONS TRIGGER (Phase 2) ──
@@ -310,9 +348,10 @@ export const handleSemanticGithubEvent = internalAction({
     });
     
     // Filter by similarity threshold
-    const AUTO_LINK_THRESHOLD = 0.88;
+    const { autoLink, suggestion } = GITHUB_CONFIG.thresholds;
+    const AUTO_LINK_THRESHOLD = autoLink;
+    const SUGGESTION_THRESHOLD = suggestion;
     const MIN_SCORE_GAP = 0.04;
-    const SUGGESTION_THRESHOLD = 0.78;
 
     const candidates = results.filter((r) => r._score >= SUGGESTION_THRESHOLD);
     if (candidates.length === 0) {
@@ -347,6 +386,7 @@ export const handleSemanticGithubEvent = internalAction({
       await ctx.runMutation(internal.github.createSemanticSuggestionEvent, {
         orgId: args.orgId,
         issueId: bestMatch._id,
+        repoFullName: args.repoFullName,
         event: args.event,
         action: args.action,
         prUrl: args.prUrl,
@@ -453,6 +493,7 @@ export const createSemanticSuggestionEvent = internalMutation({
   args: {
     orgId: v.id("organizations"),
     issueId: v.id("issues"),
+    repoFullName: v.string(),
     event: v.string(),
     action: v.string(),
     prUrl: v.string(),
@@ -478,47 +519,46 @@ export const createSemanticSuggestionEvent = internalMutation({
       return;
     }
 
-    const mentions = issue.assigneeId ? [issue.assigneeId] : [issue.creatorId];
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let suggestionData: any = {};
-    let displayBody = "";
+    let commitSha: string | undefined;
+    let idempotencyKey: string;
+    let reasonText = `Confidence: ${args.confidencePct}%\n`;
 
     if (args.event === "pull_request") {
-      suggestionData = {
-        type: "link_pr",
-        prNumber: args.prNumber,
-        status: args.merged ? "merged" : args.action,
-        confidence: args.confidencePct,
-        prUrl: args.prUrl,
-        prTitle: args.prTitle,
-        senderLogin: args.senderLogin,
-      };
-      displayBody = `🤖 **AI Suggestion** (confidence: **${args.confidencePct}%**): Does this pull request belong here? **#${args.prNumber}** opened by @${args.senderLogin}: [${args.prTitle}](${args.prUrl})\n\n<!-- ${JSON.stringify({ aiSuggestion: suggestionData })} -->`;
+      idempotencyKey = `${args.repoFullName}-pr-${args.prNumber}`;
+      reasonText += `Matched PR Title: ${args.prTitle}\nURL: ${args.prUrl}\nBy: @${args.senderLogin}`;
     } else if (args.event === "push") {
       const commits = args.commits || [];
       if (commits.length === 0) return;
       const commit = commits[0];
-      const commitHash = commit.id?.substring(0, 7) || "";
-      suggestionData = {
-        type: "link_commit",
-        commitHash,
-        commitUrl: commit.url,
-        confidence: args.confidencePct,
-        senderLogin: args.senderLogin,
-        message: commit.message.trim(),
-      };
-      displayBody = `🤖 **AI Suggestion** (confidence: **${args.confidencePct}%**): Does this commit belong here? [${commitHash}](${commit.url}) pushed by @${args.senderLogin}: _${commit.message.trim()}_\n\n<!-- ${JSON.stringify({ aiSuggestion: suggestionData })} -->`;
+      commitSha = commit.id?.substring(0, 7) || "";
+      idempotencyKey = `${args.repoFullName}-commit-${commitSha}`;
+      reasonText += `Matched Commit: ${commit.message.trim()}\nURL: ${commit.url}\nBy: @${args.senderLogin}`;
+    } else {
+      return; // Unknown event
     }
 
-    if (displayBody) {
-      await ctx.db.insert("comments", {
-        orgId: issue.orgId,
-        issueId: issue._id,
-        authorId: issue.creatorId,
-        body: displayBody,
-        mentions,
-      });
+    // Check if we've already suggested (or rejected) this specific link
+    const existing = await ctx.db
+      .query("aiSuggestions")
+      .withIndex("by_delivery", (q) => q.eq("deliveryId", idempotencyKey))
+      .filter((q) => q.eq(q.field("issueId"), args.issueId))
+      .first();
+
+    if (existing) {
+      console.log(`Suggestion for ${idempotencyKey} -> ${args.issueId} already exists. Status: ${existing.status}`);
+      return; // Deduplicate / persist rejection
     }
+
+    await ctx.db.insert("aiSuggestions", {
+      orgId: args.orgId,
+      issueId: args.issueId,
+      repoId: args.repoFullName,
+      prNumber: args.event === "pull_request" ? args.prNumber : undefined,
+      commitSha,
+      confidence: args.confidencePct,
+      reason: reasonText,
+      status: "pending",
+      deliveryId: idempotencyKey,
+    });
   },
 });

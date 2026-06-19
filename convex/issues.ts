@@ -6,6 +6,7 @@ import { logActivity } from "./lib/activity";
 import { orgMutation, orgQuery } from "./lib/customFunctions";
 import { assertCanCreateIssue } from "./lib/limits";
 import { issuePriorityValidator, issueStatusValidator } from "./schema";
+import { internalQuery } from "./_generated/server";
 
 export const issueShape = {
   _id: v.id("issues"),
@@ -84,6 +85,33 @@ export const getByNumber = orgQuery({
         q.eq("teamId", args.teamId).eq("number", args.number)
       )
       .unique();
+  },
+});
+
+export const internalGetIssueByKey = internalQuery({
+  args: { orgId: v.id("organizations"), issueKey: v.string() },
+  handler: async (ctx, args) => {
+    const parts = args.issueKey.trim().split("-");
+    if (parts.length !== 2) return null;
+    const teamKey = parts[0].toUpperCase();
+    const number = parseInt(parts[1], 10);
+    if (isNaN(number)) return null;
+
+    const team = await ctx.db
+      .query("teams")
+      .withIndex("by_org_and_key", (q) =>
+        q.eq("orgId", args.orgId).eq("key", teamKey)
+      )
+      .unique();
+    if (!team) return null;
+
+    const issue = await ctx.db
+      .query("issues")
+      .withIndex("by_team_and_number", (q) =>
+        q.eq("teamId", team._id).eq("number", number)
+      )
+      .unique();
+    return issue;
   },
 });
 

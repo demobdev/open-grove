@@ -22,6 +22,7 @@ export default function LoopsPage() {
   const { orgSlug } = useParams<{ orgSlug: string }>();
   const loops = useQuery(api.loops.listLoops);
   const skills = useQuery(api.skills.listSkills);
+  const startLoop = useMutation(api.agent.loopOrchestrator.startLoop);
   const aiAccess = useAiAccess();
 
   if (!aiAccess.hasAccess) {
@@ -138,9 +139,13 @@ export default function LoopsPage() {
                       <AlertCircle className="size-3" />
                       <span>Max retries: {loop.maxIterations}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground font-mono">
-                      Edit
-                    </span>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => startLoop({ orgId: loop.orgId, loopId: loop._id })}
+                    >
+                      <Repeat className="size-3 mr-1" /> Run Now
+                    </Button>
                   </CardFooter>
                 </Card>
               );

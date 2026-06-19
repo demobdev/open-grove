@@ -53,6 +53,9 @@ importers:
       convex-helpers:
         specifier: ^0.1.119
         version: 0.1.119(@standard-schema/spec@1.1.0)(convex@1.41.0(@clerk/react@6.9.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(bufferutil@4.1.0)(react@19.2.4)(utf-8-validate@6.0.6))(hono@4.12.25)(react@19.2.4)(typescript@5.9.3)(zod@4.4.3)
+      jose:
+        specifier: ^6.2.3
+        version: 6.2.3
       lucide-react:
         specifier: ^1.17.0
         version: 1.17.0(react@19.2.4)

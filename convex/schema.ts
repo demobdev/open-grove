@@ -86,6 +86,36 @@ export const agentRunStatusValidator = v.union(
   v.literal("cancelled")
 );
 
+export const aiSuggestionStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("accepted"),
+  v.literal("rejected"),
+  v.literal("expired")
+);
+
+export const mergeQueueStatusValidator = v.union(
+  v.literal("queued"),
+  v.literal("batched"),
+  v.literal("testing"),
+  v.literal("merged"),
+  v.literal("failed")
+);
+
+export const mergeBatchStatusValidator = v.union(
+  v.literal("creating"),
+  v.literal("testing"),
+  v.literal("passed"),
+  v.literal("failed"),
+  v.literal("merged")
+);
+
+export const loopRunStatusValidator = v.union(
+  v.literal("running"),
+  v.literal("succeeded"),
+  v.literal("failed"),
+  v.literal("stopped")
+);
+
 export default defineSchema({
   // ── Synced from Clerk via webhooks ─────────────────────────────────────
   users: defineTable({
@@ -304,6 +334,21 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_org", ["orgId"]),
 
+  loopRuns: defineTable({
+    orgId: v.id("organizations"),
+    loopId: v.id("loops"),
+    status: loopRunStatusValidator,
+    currentIteration: v.number(),
+    maxIterations: v.number(),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    resultSummary: v.optional(v.string()),
+    error: v.optional(v.string()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_loop", ["loopId"])
+    .index("by_org_and_status", ["orgId", "status"]),
+
   /**
    * Skills Registry — the "Org Brain".
    * Structured, scoped, versioned prompt templates and quality gates
@@ -368,6 +413,7 @@ export default defineSchema({
     issueId: v.optional(v.id("issues")),
     automationId: v.optional(v.id("automations")),
     loopId: v.optional(v.id("loops")),
+    loopRunId: v.optional(v.id("loopRuns")),
     skillIds: v.array(v.id("skills")),
     triggerType: agentTriggerTypeValidator,
     executionMode: executionModeValidator,
@@ -404,4 +450,55 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
     error: v.optional(v.string()),
   }).index("by_run", ["runId"]),
+
+  /**
+   * AI Suggestions — Phase 5 Semantic Github Sync
+   */
+  aiSuggestions: defineTable({
+    orgId: v.id("organizations"),
+    issueId: v.id("issues"),
+    repoId: v.string(),
+    prNumber: v.optional(v.number()),
+    commitSha: v.optional(v.string()),
+    confidence: v.number(),
+    reason: v.string(),
+    status: aiSuggestionStatusValidator,
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    deliveryId: v.optional(v.string()), // For idempotency
+  })
+    .index("by_org", ["orgId"])
+    .index("by_issue", ["issueId"])
+    .index("by_status", ["status"])
+    .index("by_org_and_status", ["orgId", "status"])
+    .index("by_delivery", ["deliveryId"]),
+
+  // ── Phase 6: Agentic Merge Queue ───────────────────────────────────────
+
+  mergeBatches: defineTable({
+    orgId: v.id("organizations"),
+    repoId: v.string(), // "owner/repo"
+    branchName: v.string(),
+    prNumbers: v.array(v.number()),
+    status: mergeBatchStatusValidator,
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_repo", ["repoId"])
+    .index("by_org_and_status", ["orgId", "status"]),
+
+  mergeQueueItems: defineTable({
+    orgId: v.id("organizations"),
+    repoId: v.string(), // "owner/repo"
+    prNumber: v.number(),
+    status: mergeQueueStatusValidator,
+    batchId: v.optional(v.id("mergeBatches")),
+    addedAt: v.number(),
+    processedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_repo", ["repoId"])
+    .index("by_repo_and_status", ["repoId", "status"])
+    .index("by_batch", ["batchId"]),
 });
