@@ -192,8 +192,8 @@ export const suggestTriage = action({
       const applied = new Set(issue.appliedLabelIds);
       const labels = output.labelNames
         .map((name) => byName.get(name.toLowerCase()))
-        .filter((label) => label !== undefined)
-        .filter((label) => !applied.has(label.labelId));
+        .filter((label: any) => label !== undefined)
+        .filter((label: any) => !applied.has(label.labelId));
 
       return {
         ok: true as const,

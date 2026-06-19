@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { useParams } from "next/navigation";
 import { Repeat, Brain, Goal, AlertCircle } from "lucide-react";
 import { api } from "@/convex/_generated/api";

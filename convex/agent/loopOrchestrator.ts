@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalAction, internalMutation } from "../_generated/server";
+import { internalAction, internalMutation, internalQuery } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { vectorAgent, VECTOR_INSTRUCTIONS } from "./vectorAgent";
 import { threadUserKey } from "./limiter";
@@ -135,21 +135,21 @@ export const executeLoopIteration = internalAction({
 
 export const internalGetLoopRun = internalQuery({
   args: { loopRunId: v.id("loopRuns") },
-  handler: async (ctx, args) => {
+  handler: async (ctx: any, args: any) => {
     return await ctx.db.get(args.loopRunId);
   },
 });
 
 export const internalGetLoop = internalQuery({
   args: { loopId: v.id("loops") },
-  handler: async (ctx, args) => {
+  handler: async (ctx: any, args: any) => {
     return await ctx.db.get(args.loopId);
   },
 });
 
 export const internalGetSkill = internalQuery({
   args: { skillId: v.id("skills") },
-  handler: async (ctx, args) => {
+  handler: async (ctx: any, args: any) => {
     return await ctx.db.get(args.skillId);
   },
 });

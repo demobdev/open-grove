@@ -15,6 +15,7 @@ import type * as agent_data from "../agent/data.js";
 import type * as agent_embeddings from "../agent/embeddings.js";
 import type * as agent_githubApp from "../agent/githubApp.js";
 import type * as agent_limiter from "../agent/limiter.js";
+import type * as agent_loopOrchestrator from "../agent/loopOrchestrator.js";
 import type * as agent_mergeTools from "../agent/mergeTools.js";
 import type * as agent_models from "../agent/models.js";
 import type * as agent_tools from "../agent/tools.js";
@@ -66,6 +67,7 @@ declare const fullApi: ApiFromModules<{
   "agent/embeddings": typeof agent_embeddings;
   "agent/githubApp": typeof agent_githubApp;
   "agent/limiter": typeof agent_limiter;
+  "agent/loopOrchestrator": typeof agent_loopOrchestrator;
   "agent/mergeTools": typeof agent_mergeTools;
   "agent/models": typeof agent_models;
   "agent/tools": typeof agent_tools;

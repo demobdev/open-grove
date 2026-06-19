@@ -22,7 +22,7 @@ export const inspectBatch = internalAction({
     const repoId = items[0].repoId;
     const token = await getInstallationTokenForRepo(repoId);
 
-    const prDetails = [];
+    const prDetails: any[] = [];
     for (const item of items) {
       const res = await fetch(`https://api.github.com/repos/${repoId}/pulls/${item.prNumber}`, {
         headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github.v3+json", "User-Agent": "OpenGrove-Agent" }
