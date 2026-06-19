@@ -1,5 +1,6 @@
 import { createTool, type ToolCtx } from "@convex-dev/agent";
-import { jsonSchema } from "ai";
+import { jsonSchema, generateText } from "ai";
+import { chatModel } from "./models";
 import { Infer } from "convex/values";
 import { internal } from "../_generated/api";
 import { DataModel, Id } from "../_generated/dataModel";
@@ -344,6 +345,411 @@ const standupReport = createTool({
   },
 });
 
+// Secure helper to fetch the short-lived GitHub OAuth access token from Clerk
+async function getGithubToken(ctx: VectorToolCtx): Promise<string> {
+  const clerkUserId = await ctx.runQuery(internal.agent.data.getClerkIdForUserOrOrg, {
+    orgId: ctx.orgId,
+    userId: ctx.requestUserId || undefined,
+  });
+
+  const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+  if (!clerkSecretKey) {
+    throw new Error("CLERK_SECRET_KEY is not configured on the Convex deployment");
+  }
+
+  const clerkUrl = `https://api.clerk.com/v1/users/${clerkUserId.clerkUserId}/oauth_access_tokens/github`;
+  const clerkResponse = await fetch(clerkUrl, {
+    headers: {
+      Authorization: `Bearer ${clerkSecretKey}`,
+    },
+  });
+
+  if (!clerkResponse.ok) {
+    throw new Error(`Clerk OAuth token fetch failed: ${await clerkResponse.text()}`);
+  }
+
+  const tokens = await clerkResponse.json();
+  if (!Array.isArray(tokens) || tokens.length === 0 || !tokens[0].token) {
+    throw new Error("GitHub account is not connected for this user/workspace. Please connect GitHub in Integrations settings.");
+  }
+
+  return tokens[0].token;
+}
+
+// Secure helper to ensure the target repository is actually connected to the organization
+async function assertRepoConnected(ctx: VectorToolCtx, repoName: string): Promise<void> {
+  const isConnected = await ctx.runQuery(internal.agent.data.isRepoConnected, {
+    orgId: ctx.orgId,
+    repoName,
+  });
+  if (!isConnected) {
+    throw new Error(`Repository "${repoName}" is not connected to this organization.`);
+  }
+}
+
+interface GithubFile {
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  changes: number;
+}
+
+interface GithubSearchItem {
+  path: string;
+  name: string;
+  html_url: string;
+}
+
+interface GithubCommitInfo {
+  commit?: {
+    message?: string;
+  };
+}
+
+const fetchPRDiff = createTool({
+  description: "Fetch the raw git diff of a GitHub pull request to see what code changes are proposed.",
+  inputSchema: jsonSchema<{ repoName: string; prNumber: number }>({
+    type: "object",
+    properties: {
+      repoName: { type: "string", description: "The full name of the repository (e.g. owner/repo)" },
+      prNumber: { type: "number", description: "The Pull Request number" },
+    },
+    required: ["repoName", "prNumber"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input): Promise<string> => {
+    await assertRepoConnected(ctx, input.repoName);
+    const token = await getGithubToken(ctx);
+    const url = `https://api.github.com/repos/${input.repoName}/pulls/${input.prNumber}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/vnd.github.v3.diff",
+        "User-Agent": "OpenGrove-Agent",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PR diff: ${response.statusText}`);
+    }
+    return await response.text();
+  },
+});
+
+const fetchChangedFiles = createTool({
+  description: "Get the list of changed files in a GitHub pull request, including addition and deletion counts.",
+  inputSchema: jsonSchema<{ repoName: string; prNumber: number }>({
+    type: "object",
+    properties: {
+      repoName: { type: "string", description: "Repository full name, e.g. owner/repo" },
+      prNumber: { type: "number", description: "The Pull Request number" },
+    },
+    required: ["repoName", "prNumber"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input): Promise<Array<{
+    filename: string;
+    status: string;
+    additions: number;
+    deletions: number;
+    changes: number;
+  }>> => {
+    await assertRepoConnected(ctx, input.repoName);
+    const token = await getGithubToken(ctx);
+    const url = `https://api.github.com/repos/${input.repoName}/pulls/${input.prNumber}/files`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/json",
+        "User-Agent": "OpenGrove-Agent",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch changed files: ${response.statusText}`);
+    }
+    const files = await response.json() as GithubFile[];
+    if (!Array.isArray(files)) {
+      throw new Error("Invalid response format from GitHub");
+    }
+    return files.map((f) => ({
+      filename: f.filename,
+      status: f.status,
+      additions: f.additions,
+      deletions: f.deletions,
+      changes: f.changes,
+    }));
+  },
+});
+
+const fetchFileContent = createTool({
+  description: "Fetch the content of a specific file in a GitHub repository.",
+  inputSchema: jsonSchema<{ repoName: string; path: string; ref?: string }>({
+    type: "object",
+    properties: {
+      repoName: { type: "string", description: "Repository full name, e.g. owner/repo" },
+      path: { type: "string", description: "The path to the file from the repo root" },
+      ref: { type: "string", description: "Optional git reference (branch, tag, or commit hash)" },
+    },
+    required: ["repoName", "path"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input): Promise<string> => {
+    await assertRepoConnected(ctx, input.repoName);
+    const token = await getGithubToken(ctx);
+    let url = `https://api.github.com/repos/${input.repoName}/contents/${input.path}`;
+    if (input.ref) {
+      url += `?ref=${encodeURIComponent(input.ref)}`;
+    }
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/json",
+        "User-Agent": "OpenGrove-Agent",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch file content: ${response.statusText}`);
+    }
+    const data = await response.json();
+    if (data.encoding === "base64" && data.content) {
+      return atob(data.content.replace(/\s/g, ""));
+    }
+    return typeof data.content === "string" ? data.content : JSON.stringify(data);
+  },
+});
+
+const searchRepoCode = createTool({
+  description: "Search for code strings or patterns inside a connected GitHub repository.",
+  inputSchema: jsonSchema<{ repoName: string; query: string }>({
+    type: "object",
+    properties: {
+      repoName: { type: "string", description: "Repository full name, e.g. owner/repo" },
+      query: { type: "string", description: "The search query (GitHub search query syntax)" },
+    },
+    required: ["repoName", "query"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input): Promise<Array<{
+    path: string;
+    name: string;
+    htmlUrl: string;
+  }>> => {
+    await assertRepoConnected(ctx, input.repoName);
+    const token = await getGithubToken(ctx);
+    const url = `https://api.github.com/search/code?q=${encodeURIComponent(input.query + ` repo:${input.repoName}`)}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/json",
+        "User-Agent": "OpenGrove-Agent",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to search repo code: ${response.statusText}`);
+    }
+    const data = await response.json();
+    const items = (data.items || []) as GithubSearchItem[];
+    return items.map((item) => ({
+      path: item.path,
+      name: item.name,
+      htmlUrl: item.html_url,
+    }));
+  },
+});
+
+const mapPRToIssues = createTool({
+  description: "Extract issue keys (e.g., ENG-123) from a GitHub PR (title, body, commits) and return matching issue summaries from the workspace database.",
+  inputSchema: jsonSchema<{ repoName: string; prNumber: number }>({
+    type: "object",
+    properties: {
+      repoName: { type: "string", description: "Repository full name, e.g. owner/repo" },
+      prNumber: { type: "number", description: "The Pull Request number" },
+    },
+    required: ["repoName", "prNumber"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input): Promise<IssueSummary[]> => {
+    await assertRepoConnected(ctx, input.repoName);
+    const token = await getGithubToken(ctx);
+    
+    // 1. Fetch PR details
+    const prUrl = `https://api.github.com/repos/${input.repoName}/pulls/${input.prNumber}`;
+    const prResponse = await fetch(prUrl, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/json",
+        "User-Agent": "OpenGrove-Agent",
+      },
+    });
+    if (!prResponse.ok) {
+      throw new Error(`Failed to fetch PR: ${prResponse.statusText}`);
+    }
+    const pr = await prResponse.json();
+    let textToScan = `${pr.title || ""} ${pr.body || ""}`;
+
+    // 2. Fetch PR commits
+    const commitsUrl = `https://api.github.com/repos/${input.repoName}/pulls/${input.prNumber}/commits`;
+    const commitsResponse = await fetch(commitsUrl, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/json",
+        "User-Agent": "OpenGrove-Agent",
+      },
+    });
+    if (commitsResponse.ok) {
+      const commits = await commitsResponse.json() as GithubCommitInfo[];
+      if (Array.isArray(commits)) {
+        textToScan += " " + commits.map((c) => c.commit?.message || "").join(" ");
+      }
+    }
+
+    // 3. Scan for issue keys
+    const matches = textToScan.match(/([a-zA-Z0-9]+)-(\d+)/g);
+    if (!matches || matches.length === 0) {
+      return [];
+    }
+
+    const identifiers: { teamKey: string; number: number }[] = [];
+    const seen = new Set<string>();
+    
+    for (const match of matches) {
+      const parts = match.split("-");
+      const key = parts[0].toUpperCase();
+      const num = parseInt(parts[1], 10);
+      const idStr = `${key}-${num}`;
+      
+      if (!seen.has(idStr)) {
+        seen.add(idStr);
+        identifiers.push({ teamKey: key, number: num });
+      }
+    }
+
+    return await ctx.runQuery(internal.agent.data.issueSummariesByIdentifiers, {
+      orgId: ctx.orgId,
+      identifiers,
+    });
+  },
+});
+
+const analyzePRRisk = createTool({
+  description: "Examine a PR's changed files and diff to compute a risk score (1-10) and summary using LLM reasoning.",
+  inputSchema: jsonSchema<{ repoName: string; prNumber: number }>({
+    type: "object",
+    properties: {
+      repoName: { type: "string", description: "Repository full name, e.g. owner/repo" },
+      prNumber: { type: "number", description: "The Pull Request number" },
+    },
+    required: ["repoName", "prNumber"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input): Promise<
+    | { riskScore: number; reason: string; criticalFilesTouched: string[] }
+    | { rawLLMResponse: string }
+  > => {
+    await assertRepoConnected(ctx, input.repoName);
+    const token = await getGithubToken(ctx);
+
+    // 1. Fetch changed files list
+    const filesUrl = `https://api.github.com/repos/${input.repoName}/pulls/${input.prNumber}/files`;
+    const filesResponse = await fetch(filesUrl, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/json",
+        "User-Agent": "OpenGrove-Agent",
+      },
+    });
+    if (!filesResponse.ok) {
+      throw new Error(`Failed to fetch changed files: ${filesResponse.statusText}`);
+    }
+    const files = await filesResponse.json() as GithubFile[];
+    const changedFilesSummary = (files || []).map((f) => `${f.filename} (+${f.additions}, -${f.deletions})`).join("\n");
+
+    // 2. Fetch raw diff (limit to avoid token limit errors)
+    const diffUrl = `https://api.github.com/repos/${input.repoName}/pulls/${input.prNumber}`;
+    const diffResponse = await fetch(diffUrl, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/vnd.github.v3.diff",
+        "User-Agent": "OpenGrove-Agent",
+      },
+    });
+    let rawDiff = "";
+    if (diffResponse.ok) {
+      rawDiff = await diffResponse.text();
+      if (rawDiff.length > 50000) {
+        rawDiff = rawDiff.substring(0, 50000) + "\n... [diff truncated for length]";
+      }
+    }
+
+    // 3. Ask LLM to evaluate risk
+    const prompt = `You are a Senior Security & Release Engineer. Review the following details of GitHub Pull Request #${input.prNumber} in "${input.repoName}":
+
+Changed files:
+${changedFilesSummary}
+
+Diff Summary:
+${rawDiff}
+
+Analyze the changes. Focus on:
+1. Impact on critical configuration files, auth files, dependencies, and database schemas.
+2. Code complexity and volume of changes.
+3. Potential for regression, security vulnerabilities, or infrastructure breakage.
+
+Respond with a JSON block containing:
+- riskScore: A number from 1 (very safe) to 10 (extremely risky/dangerous).
+- reason: A short, concise summary explaining the score.
+- criticalFilesTouched: A list of any highly sensitive files modified.`;
+
+    const { text } = await generateText({
+      model: chatModel,
+      prompt,
+    });
+
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      return { rawLLMResponse: text };
+    } catch {
+      return { rawLLMResponse: text };
+    }
+  },
+});
+
+const postPRComment = createTool({
+  description: "Post a comment or PR review text on a connected GitHub repository Pull Request.",
+  inputSchema: jsonSchema<{ repoName: string; prNumber: number; body: string }>({
+    type: "object",
+    properties: {
+      repoName: { type: "string", description: "Repository full name, e.g. owner/repo" },
+      prNumber: { type: "number", description: "The Pull Request number" },
+      body: { type: "string", description: "The markdown text of the comment to post" },
+    },
+    required: ["repoName", "prNumber", "body"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input): Promise<{ commentId: number; url: string }> => {
+    await assertRepoConnected(ctx, input.repoName);
+    const token = await getGithubToken(ctx);
+    const url = `https://api.github.com/repos/${input.repoName}/issues/${input.prNumber}/comments`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `token ${token}`,
+        "Content-Type": "application/json",
+        "User-Agent": "OpenGrove-Agent",
+      },
+      body: JSON.stringify({ body: input.body }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to post comment: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return { commentId: data.id, url: data.html_url };
+  },
+});
+
 export const vectorTools = {
   listTeams,
   listMembers,
@@ -354,4 +760,11 @@ export const vectorTools = {
   updateIssue,
   cycleSummary,
   standupReport,
+  fetchPRDiff,
+  fetchChangedFiles,
+  fetchFileContent,
+  searchRepoCode,
+  mapPRToIssues,
+  analyzePRRisk,
+  postPRComment,
 };

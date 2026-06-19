@@ -834,3 +834,84 @@ export const standupForOrg = internalQuery({
     return { sinceHours: args.sinceHours, entries };
   },
 });
+
+export const getClerkIdForUserOrOrg = internalQuery({
+  args: {
+    orgId: v.id("organizations"),
+    userId: v.optional(v.id("users")),
+  },
+  returns: v.object({
+    clerkUserId: v.string(),
+  }),
+  handler: async (ctx, args) => {
+    if (args.userId) {
+      const user = await ctx.db.get(args.userId);
+      if (user) {
+        return { clerkUserId: user.clerkId };
+      }
+    }
+    // Fallback: pick the first member of the org
+    const members = await ctx.db
+      .query("members")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    for (const member of members) {
+      const user = await ctx.db.get(member.userId);
+      if (user) {
+        return { clerkUserId: user.clerkId };
+      }
+    }
+    throw new Error("No members found in the organization to perform GitHub integration actions.");
+  },
+});
+
+export const isRepoConnected = internalQuery({
+  args: {
+    orgId: v.id("organizations"),
+    repoName: v.string(),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const conn = await ctx.db
+      .query("connectedRepos")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      // eslint-disable-next-line @convex-dev/no-filter-in-query
+      .filter((q) => q.eq(q.field("repoName"), args.repoName))
+      .first();
+    return !!conn;
+  },
+});
+
+export const issueSummariesByIdentifiers = internalQuery({
+  args: {
+    orgId: v.id("organizations"),
+    identifiers: v.array(
+      v.object({
+        teamKey: v.string(),
+        number: v.number(),
+      })
+    ),
+  },
+  returns: v.array(issueSummaryValidator),
+  handler: async (ctx, args) => {
+    const teamKeys = new Map<Id<"teams">, string>();
+    const summaries = [];
+    
+    for (const ident of args.identifiers) {
+      const team = await ctx.db
+        .query("teams")
+        .withIndex("by_org_and_key", (q) => q.eq("orgId", args.orgId).eq("key", ident.teamKey.toUpperCase().trim()))
+        .first();
+      if (!team) continue;
+      
+      const issue = await ctx.db
+        .query("issues")
+        .withIndex("by_team_and_number", (q) => q.eq("teamId", team._id).eq("number", ident.number))
+        .first();
+      if (!issue || issue.orgId !== args.orgId) continue;
+      
+      summaries.push(await summarizeIssue(ctx, issue, teamKeys));
+    }
+    return summaries;
+  },
+});
