@@ -135,21 +135,11 @@ export const handleGithubEvent = internalMutation({
         const activeAutomations = automations.filter(a => a.isEnabled);
         
         for (const automation of activeAutomations) {
-          // Record the execution in the agentRuns ledger
-          await ctx.db.insert("agentRuns", {
-            orgId: conn.orgId,
+          // Schedule the automation dispatcher in the background to prevent webhook timeouts
+          await ctx.scheduler.runAfter(0, internal.automations.dispatchAutomation, {
             automationId: automation._id,
-            skillIds: automation.targetSkillId ? [automation.targetSkillId] : [],
-            loopId: automation.targetLoopId,
-            triggerType: triggerType,
-            executionMode: automation.executionMode,
-            status: "queued",
-            summary: `Triggered by ${triggerType} on ${repoFullName}`,
-            startedAt: Date.now(),
+            payload: body,
           });
-          
-          // In Phase 3 (Loops), this is where we actually schedule the background action
-          // to spawn the LLM loop. For now, it just queues it in the ledger.
         }
       }
     }

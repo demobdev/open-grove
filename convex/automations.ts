@@ -2,7 +2,8 @@ import { v } from "convex/values";
 import { orgMutation, orgQuery } from "./lib/customFunctions";
 import { assertCanCreateAutomation } from "./lib/limits";
 import { agentTriggerTypeValidator, executionModeValidator } from "./schema";
-import { internalQuery } from "./_generated/server";
+import { internalQuery, internalAction } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 export const listAutomations = orgQuery({
   args: {},
@@ -149,6 +150,66 @@ export const internalGetActiveAutomationsByTrigger = internalQuery({
       )
       .collect();
     
-    return automations.filter(a => a.isEnabled);
+    return automations.filter((a: any) => a.isEnabled);
+  },
+});
+
+export const internalGetAutomation = internalQuery({
+  args: { automationId: v.id("automations") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.automationId);
+  },
+});
+
+export const dispatchAutomation = internalAction({
+  args: {
+    automationId: v.id("automations"),
+    payload: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const automation = await ctx.runQuery(internal.automations.internalGetAutomation, {
+      automationId: args.automationId,
+    });
+    if (!automation || !automation.isEnabled) return;
+
+    if (automation.targetLoopId) {
+      await ctx.runMutation(internal.agent.loopOrchestrator.startLoop, {
+        orgId: automation.orgId,
+        loopId: automation.targetLoopId,
+      });
+    } else if (automation.targetSkillId) {
+      await ctx.runAction(internal.agent.automationsAgent.runSkillAction, {
+        orgId: automation.orgId,
+        automationId: automation._id,
+        skillId: automation.targetSkillId,
+        payload: args.payload,
+        executionMode: automation.executionMode,
+      });
+    }
+  },
+});
+export const internalGetAllOrgs = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("organizations").collect();
+  },
+});
+
+export const internalRunCronAutomations = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    const orgs = await ctx.runQuery(internal.automations.internalGetAllOrgs, {});
+    for (const org of orgs) {
+      const activeAutomations = await ctx.runQuery(internal.automations.internalGetActiveAutomationsByTrigger, {
+        orgId: org._id,
+        triggerType: "cron",
+      });
+      for (const automation of activeAutomations) {
+        await ctx.runAction(internal.automations.dispatchAutomation, {
+          automationId: automation._id,
+          payload: { trigger: "cron", timestamp: Date.now() },
+        });
+      }
+    }
   },
 });

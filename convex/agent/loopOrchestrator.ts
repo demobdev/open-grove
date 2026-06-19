@@ -3,6 +3,8 @@ import { internalAction, internalMutation, internalQuery } from "../_generated/s
 import { internal } from "../_generated/api";
 import { vectorAgent, VECTOR_INSTRUCTIONS } from "./vectorAgent";
 import { threadUserKey } from "./limiter";
+import { chatModel } from "./models";
+import { generateText, Output, jsonSchema } from "ai";
 
 /**
  * Starts a new execution of a Loop.
@@ -78,22 +80,34 @@ export const executeLoopIteration = internalAction({
 
     try {
       // 2. Action Phase
-      // In a full implementation we'd spin up an agent and track it via agentRuns.
-      // We will use the Vercel AI SDK embedded in vectorAgent or similar.
-      // For V1 of the Orchestrator, we log the run and invoke the LLM.
-
-      // Mocking the interaction for now:
-      // const actionResult = await runActionAgent(actionSkill.content, args.feedbackContext);
-      const actionResult = `[Action Execution Output] Simulated output based on ${actionSkill.slug}`;
+      const { text: actionResult } = await generateText({
+        model: chatModel,
+        system: actionSkill.content,
+        prompt: args.feedbackContext 
+          ? `Previous validation feedback: ${args.feedbackContext}\n\nPlease revise your output.`
+          : `Execute the task described in the system instructions.`,
+      });
 
       // 3. Validation Phase
-      // We ask the Validation Agent to evaluate `actionResult` against `validationSkill.content`.
-      // Expecting a structured JSON output {"passed": boolean, "feedback": string}
-      
-      // const validationResult = await runValidationAgent(validationSkill.content, actionResult);
-      // Let's assume validation passes on iteration >= 2 just to simulate a loop.
-      const validationPassed = loopRun.currentIteration >= 2;
-      const validationFeedback = validationPassed ? "Looks good." : "Failed to meet criteria. Try again.";
+      const { output: validationOutput } = await generateText({
+        model: chatModel,
+        output: Output.object({
+          schema: jsonSchema<{ passed: boolean; feedback: string }>({
+            type: "object",
+            properties: {
+              passed: { type: "boolean", description: "True if the action result meets all criteria." },
+              feedback: { type: "string", description: "Feedback for the action agent if it failed, or a success message." },
+            },
+            required: ["passed", "feedback"],
+            additionalProperties: false,
+          }),
+        }),
+        system: validationSkill.content,
+        prompt: `Evaluate the following action result against your criteria:\n\n${actionResult}`,
+      });
+
+      const validationPassed = validationOutput.passed;
+      const validationFeedback = validationOutput.feedback;
 
       // 4. Evaluation
       if (validationPassed) {

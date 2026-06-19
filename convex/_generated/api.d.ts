@@ -10,6 +10,7 @@
 
 import type * as activity from "../activity.js";
 import type * as agentRuns from "../agentRuns.js";
+import type * as agent_automationsAgent from "../agent/automationsAgent.js";
 import type * as agent_chat from "../agent/chat.js";
 import type * as agent_data from "../agent/data.js";
 import type * as agent_embeddings from "../agent/embeddings.js";
@@ -26,6 +27,7 @@ import type * as apiKeys from "../apiKeys.js";
 import type * as attachments from "../attachments.js";
 import type * as automations from "../automations.js";
 import type * as comments from "../comments.js";
+import type * as crons from "../crons.js";
 import type * as cycles from "../cycles.js";
 import type * as github from "../github.js";
 import type * as githubConnection from "../githubConnection.js";
@@ -62,6 +64,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   activity: typeof activity;
   agentRuns: typeof agentRuns;
+  "agent/automationsAgent": typeof agent_automationsAgent;
   "agent/chat": typeof agent_chat;
   "agent/data": typeof agent_data;
   "agent/embeddings": typeof agent_embeddings;
@@ -78,6 +81,7 @@ declare const fullApi: ApiFromModules<{
   attachments: typeof attachments;
   automations: typeof automations;
   comments: typeof comments;
+  crons: typeof crons;
   cycles: typeof cycles;
   github: typeof github;
   githubConnection: typeof githubConnection;

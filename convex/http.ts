@@ -260,5 +260,51 @@ http.route({
   }),
 });
 
+/**
+ * POST /api/webhook/:automationId
+ * 
+ * The external Webhook API for Zapier, Make, custom integrations, etc.
+ * Dispatches an automation using the body as payload.
+ */
+http.route({
+  pathPrefix: "/api/webhook/",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const auth = await verifyApiKey(ctx, request);
+    if (auth.error || !auth.apiKey) {
+      return new Response(JSON.stringify({ error: auth.error || "Unauthorized" }), {
+        status: auth.status,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const url = new URL(request.url);
+    const pathParts = url.pathname.split("/");
+    const automationId = pathParts[pathParts.length - 1];
+
+    if (!automationId) {
+      return new Response(JSON.stringify({ error: "Missing automationId in URL" }), { status: 400 });
+    }
+
+    let payload;
+    try {
+      payload = await request.json();
+    } catch {
+      payload = await request.text();
+    }
+
+    // Call dispatchAutomation in the background
+    await ctx.runAction(internal.automations.dispatchAutomation, {
+      automationId: automationId as any,
+      payload,
+    });
+
+    return new Response(JSON.stringify({ success: true, message: "Webhook received and automation dispatched" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }),
+});
+
 export default http;
 

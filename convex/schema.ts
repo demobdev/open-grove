@@ -68,7 +68,8 @@ export const agentTriggerTypeValidator = v.union(
   v.literal("github_push"),
   v.literal("cron"),
   v.literal("issue_created"),
-  v.literal("issue_status_changed")
+  v.literal("issue_status_changed"),
+  v.literal("incoming_webhook")
 );
 
 export const executionModeValidator = v.union(
