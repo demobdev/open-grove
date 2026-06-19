@@ -89,9 +89,9 @@ export default function LoopsPage() {
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {loops.map((loop) => {
-              const actionSkill = skills.find(s => s._id === loop.actionSkillId);
-              const validationSkill = skills.find(s => s._id === loop.validationSkillId);
+            {loops.map((loop: any) => {
+              const actionSkill = skills.find((s: any) => s._id === loop.actionSkillId);
+              const validationSkill = skills.find((s: any) => s._id === loop.validationSkillId);
               
               return (
                 <Card 

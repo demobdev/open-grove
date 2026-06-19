@@ -113,7 +113,7 @@ export default function AutomationsPage() {
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {automations.map((automation: any) => {
-              const targetSkill = skills.find(s => s._id === automation.targetSkillId);
+              const targetSkill = skills.find((s: any) => s._id === automation.targetSkillId);
               
               return (
                 <Card 
