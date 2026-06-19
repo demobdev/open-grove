@@ -44,9 +44,13 @@ export function CreateAutomationDialog({
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [triggerType, setTriggerType] = useState<string>("github_pr_opened");
+  const [triggerType, setTriggerType] = useState<
+    "manual" | "github_pr_opened" | "github_pr_merged" | "github_push" | "cron" | "issue_created" | "issue_status_changed"
+  >("github_pr_opened");
   const [targetId, setTargetId] = useState<string>("");
-  const [executionMode, setExecutionMode] = useState<string>("suggest_only");
+  const [executionMode, setExecutionMode] = useState<
+    "suggest_only" | "draft" | "auto_execute"
+  >("suggest_only");
   const [isEnabled, setIsEnabled] = useState(true);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -134,7 +138,7 @@ export function CreateAutomationDialog({
 
             <div className="grid gap-2">
               <Label>IF Trigger Event</Label>
-              <Select value={triggerType} onValueChange={setTriggerType}>
+              <Select value={triggerType} onValueChange={(val) => setTriggerType(val as "manual" | "github_pr_opened" | "github_pr_merged" | "github_push" | "cron" | "issue_created" | "issue_status_changed")}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select trigger" />
                 </SelectTrigger>
@@ -189,7 +193,7 @@ export function CreateAutomationDialog({
 
             <div className="grid gap-2">
               <Label>Execution Mode</Label>
-              <Select value={executionMode} onValueChange={setExecutionMode}>
+              <Select value={executionMode} onValueChange={(val) => setExecutionMode(val as "suggest_only" | "draft" | "auto_execute")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

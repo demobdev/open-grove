@@ -67,7 +67,7 @@ export function FeaturesSecurity() {
                   <div className="mt-1 size-2 rounded-full bg-emerald-500" />
                   <div className="flex-1 space-y-1">
                     <p className="text-sm font-medium">Verify API Key Scope</p>
-                    <p className="text-xs text-muted-foreground font-mono">scopes: ["repo:read", "issues:write"]</p>
+                    <p className="text-xs text-muted-foreground font-mono">scopes: [&quot;repo:read&quot;, &quot;issues:write&quot;]</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
