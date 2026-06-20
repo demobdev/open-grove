@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/command";
 import { CreateIssueDialog } from "@/components/issues/create-issue-dialog";
 import { appCommands, CommandHelpers } from "./registry";
+import { Sparkles } from "lucide-react";
 
 type CommandContextValue = {
   openPalette: () => void;
@@ -53,6 +54,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 export function CommandProvider({ children }: { children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [createIssueOpen, setCreateIssueOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const router = useRouter();
   const params = useParams<{ orgSlug?: string }>();
   const { resolvedTheme, setTheme } = useTheme();
@@ -114,18 +116,52 @@ export function CommandProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       const command = appCommands.find((c) => c.id === id);
       setPaletteOpen(false);
+      setSearch("");
       command?.run(helpers);
     },
     [helpers]
   );
 
+  const runAiCommand = useCallback(() => {
+    if (!search.trim()) return;
+    setPaletteOpen(false);
+    helpers.push(`/${helpers.orgSlug}/ai?q=${encodeURIComponent(search.trim())}`);
+    setSearch("");
+  }, [search, helpers]);
+
   return (
     <CommandContext.Provider value={contextValue}>
       {children}
       <CommandDialog open={paletteOpen} onOpenChange={setPaletteOpen}>
-        <CommandInput placeholder="Type a command or search…" />
+        <CommandInput 
+          placeholder="Type a command or search…" 
+          value={search}
+          onValueChange={setSearch}
+        />
         <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
+          <CommandEmpty>
+            {search.trim() ? (
+              <div 
+                className="flex cursor-pointer items-center gap-2 px-2 py-4 text-sm text-indigo-500 hover:bg-muted"
+                onClick={runAiCommand}
+              >
+                <Sparkles className="h-4 w-4" />
+                Ask OpenGrove AI: "{search}"
+              </div>
+            ) : (
+              "No results found."
+            )}
+          </CommandEmpty>
+          
+          {search.trim() && (
+            <CommandGroup heading="AI Actions">
+              <CommandItem onSelect={runAiCommand} value={`ask ai ${search}`}>
+                <Sparkles className="h-4 w-4 text-indigo-500" />
+                Ask OpenGrove AI: "{search}"
+              </CommandItem>
+            </CommandGroup>
+          )}
+
           {groups.map(([group, commands]) => (
             <CommandGroup key={group} heading={group}>
               {commands.map((command) => (

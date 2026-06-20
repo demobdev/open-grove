@@ -3,6 +3,7 @@
 import { optimisticallySendMessage } from "@convex-dev/agent/react";
 import { useMutation, useQuery } from "convex/react";
 import { Bot, Loader2, Sparkles } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
@@ -22,7 +23,7 @@ const SUGGESTIONS = [
   "Find issues that look like duplicates",
 ];
 
-export function AiAgentPage() {
+export function AiAgentPage({ initialQuery }: { initialQuery?: string }) {
   const { isLoaded, hasAccess } = useAiAccess();
 
   if (!isLoaded) {
@@ -35,10 +36,12 @@ export function AiAgentPage() {
   if (!hasAccess) {
     return <AiUpgradeCta />;
   }
-  return <AiWorkspace />;
+  return <AiWorkspace initialQuery={initialQuery} />;
 }
 
-function AiWorkspace() {
+function AiWorkspace({ initialQuery }: { initialQuery?: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const threads = useQuery(api.agent.chat.listThreads);
   const quota = useQuery(api.agent.chat.quota);
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
@@ -88,6 +91,13 @@ function AiWorkspace() {
       throw error;
     }
   };
+
+  useEffect(() => {
+    if (initialQuery && !quotaExhausted) {
+      void send(initialQuery);
+      router.replace(pathname); // Strip the query param after consuming
+    }
+  }, [initialQuery, quotaExhausted, router, pathname]);
 
   const removeThread = (threadId: string) => {
     deleteThread({ threadId })
@@ -145,26 +155,26 @@ function EmptyState({
   disabled: boolean;
 }) {
   return (
-    <div className="flex flex-1 items-center justify-center p-8">
-      <div className="flex w-full max-w-md flex-col items-center gap-5 text-center">
-        <div className="flex size-10 items-center justify-center rounded-lg border bg-primary/10">
-          <Sparkles className="size-5 text-primary" />
+    <div className="flex flex-1 items-center justify-center p-8 animate-in fade-in duration-500">
+      <div className="flex w-full max-w-2xl flex-col items-center gap-6 text-center">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 shadow-inner">
+          <Sparkles className="size-7 text-indigo-500" />
         </div>
-        <div className="flex flex-col gap-1">
-          <h2 className="text-base font-semibold">Ask OpenGrove</h2>
-          <p className="text-sm text-muted-foreground">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-2xl font-semibold tracking-tight">Ask OpenGrove AI</h2>
+          <p className="text-muted-foreground text-sm max-w-[400px] mx-auto leading-relaxed">
             OpenGrove knows your teams, issues, projects and cycles — and can
-            create or update issues for you.
+            create, update, or analyze them for you. Let's get to work.
           </p>
         </div>
-        <div className="flex w-full flex-col gap-1.5">
+        <div className="grid w-full grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
           {SUGGESTIONS.map((suggestion) => (
             <Button
               key={suggestion}
               variant="outline"
-              size="sm"
+              size="default"
               disabled={disabled}
-              className="justify-start font-normal text-muted-foreground"
+              className="h-auto justify-start font-normal text-muted-foreground whitespace-normal text-left py-3 px-4 hover:border-indigo-500/30 hover:bg-indigo-500/5 hover:text-foreground transition-all"
               onClick={() => void onSuggestion(suggestion)}
             >
               {suggestion}
@@ -175,3 +185,4 @@ function EmptyState({
     </div>
   );
 }
+

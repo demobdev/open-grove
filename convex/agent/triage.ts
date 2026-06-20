@@ -95,12 +95,12 @@ export const findDuplicates = action({
       return {
         ok: true as const,
         duplicates: summaries
-          .map((summary) => ({
+          .map((summary: any) => ({
             ...summary,
             similarity:
               Math.round((scores.get(summary.issueId) ?? 0) * 100) / 100,
           }))
-          .sort((a, b) => b.similarity - a.similarity)
+          .sort((a: any, b: any) => b.similarity - a.similarity)
           .slice(0, 5),
       };
     } catch (error) {
@@ -141,7 +141,7 @@ export const suggestTriage = action({
       return { ok: false as const, error: AI_NOT_CONFIGURED_MESSAGE };
     }
 
-    const labelNames = issue.orgLabels.map((label) => label.name);
+    const labelNames = issue.orgLabels.map((label: any) => label.name);
     try {
       const { output } = await generateText({
         model: chatModel,
@@ -188,7 +188,7 @@ export const suggestTriage = action({
       });
 
       const byName = new Map(
-        issue.orgLabels.map((label) => [label.name.toLowerCase(), label])
+        issue.orgLabels.map((label: any) => [label.name.toLowerCase(), label])
       );
       const applied = new Set(issue.appliedLabelIds);
       const labels = output.labelNames
@@ -303,4 +303,167 @@ export const resolveSuggestion = orgMutation({
        }
     }
   }
+});
+
+/** Semantic duplicate detection over text input (for real-time issue creation) */
+export const findDuplicatesFromText = action({
+  args: { title: v.string(), description: v.optional(v.string()) },
+  returns: v.union(
+    failure,
+    v.object({
+      ok: v.literal(true),
+      duplicates: v.array(
+        v.object({
+          ...issueSummaryValidator.fields,
+          similarity: v.number(),
+        })
+      ),
+    })
+  ),
+  handler: async (ctx, args): Promise<DuplicatesResult> => {
+    const auth = await ctx.runQuery(internal.agent.data.authorizeAi, {});
+    if (!isAiConfigured()) {
+      return { ok: false as const, error: AI_NOT_CONFIGURED_MESSAGE };
+    }
+    try {
+      const text = args.description
+        ? `${args.title}\n\n${args.description}`
+        : args.title;
+      // Skip if it's too short to be meaningful
+      if (text.length < 5) {
+        return { ok: true as const, duplicates: [] };
+      }
+      
+      const embedding = await embedText(text);
+
+      const results = await ctx.vectorSearch("issues", "by_embedding", {
+        vector: embedding,
+        limit: 8,
+        filter: (q) => q.eq("orgId", auth.orgId),
+      });
+      const candidates = results.filter(
+        (result) => result._score >= 0.4
+      );
+      if (candidates.length === 0) {
+        return { ok: true as const, duplicates: [] };
+      }
+      const summaries = await ctx.runQuery(
+        internal.agent.data.issueSummariesByIds,
+        { orgId: auth.orgId, issueIds: candidates.map((c) => c._id) }
+      );
+      const scores = new Map(candidates.map((c) => [c._id, c._score]));
+      return {
+        ok: true as const,
+        duplicates: summaries
+          .map((summary: any) => ({
+            ...summary,
+            similarity:
+              Math.round((scores.get(summary.issueId) ?? 0) * 100) / 100,
+          }))
+          .sort((a: any, b: any) => b.similarity - a.similarity)
+          .slice(0, 5),
+      };
+    } catch (error) {
+      console.error("Duplicate detection failed", error);
+      return {
+        ok: false as const,
+        error: "Could not check for duplicates. Please try again.",
+      };
+    }
+  },
+});
+
+/** Suggest a priority + labels from text input (for real-time issue creation) */
+export const suggestTriageFromText = action({
+  args: { title: v.string(), description: v.optional(v.string()) },
+  returns: v.union(
+    failure,
+    v.object({
+      ok: v.literal(true),
+      priority: issuePriorityValidator,
+      labels: v.array(
+        v.object({
+          labelId: v.id("labels"),
+          name: v.string(),
+          color: v.string(),
+        })
+      ),
+      reasoning: v.string(),
+    })
+  ),
+  handler: async (ctx, args): Promise<TriageSuggestionResult> => {
+    const auth = await ctx.runQuery(internal.agent.data.authorizeAi, {});
+    if (!isAiConfigured()) {
+      return { ok: false as const, error: AI_NOT_CONFIGURED_MESSAGE };
+    }
+
+    const orgLabels = await ctx.runQuery(internal.agent.data.listOrgLabels, { orgId: auth.orgId });
+    const labelNames = orgLabels.map((label: any) => label.name);
+    try {
+      const { output } = await generateText({
+        model: chatModel,
+        output: Output.object({
+          schema: jsonSchema<{
+            priority: SuggestedPriority;
+            labelNames: string[];
+            reasoning: string;
+          }>({
+            type: "object",
+            properties: {
+              priority: {
+                type: "string",
+                enum: [...PRIORITIES],
+                description: "Suggested priority for the issue",
+              },
+              labelNames: {
+                type: "array",
+                items: { type: "string" },
+                description:
+                  "Labels to apply, chosen ONLY from the provided workspace labels (empty if none fit)",
+              },
+              reasoning: {
+                type: "string",
+                description: "One short sentence explaining the suggestion",
+              },
+            },
+            required: ["priority", "labelNames", "reasoning"],
+            additionalProperties: false,
+          }),
+        }),
+        prompt: [
+          "You triage issues in a software project tracker.",
+          `Title: ${args.title}`,
+          args.description ? `Description: ${args.description}` : "",
+          labelNames.length > 0
+            ? `Workspace labels you may choose from: ${labelNames.join(", ")}`
+            : "This workspace has no labels yet, so suggest none.",
+          "Suggest the most fitting priority (urgent = production-breaking, high = important and time-sensitive, medium = normal, low = nice-to-have, none = unclear) and any fitting labels.",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      });
+
+      const byName = new Map(
+        orgLabels.map((label: any) => [label.name.toLowerCase(), label])
+      );
+      const labels = output.labelNames
+        .map((name) => byName.get(name.toLowerCase()))
+        .filter((label: any) => label !== undefined);
+
+      return {
+        ok: true as const,
+        priority: PRIORITIES.includes(output.priority)
+          ? output.priority
+          : ("none" as const),
+        labels: labels as any,
+        reasoning: output.reasoning,
+      };
+    } catch (error) {
+      console.error("Triage suggestion failed", error);
+      return {
+        ok: false as const,
+        error: "Could not generate triage suggestions. Please try again.",
+      };
+    }
+  },
 });

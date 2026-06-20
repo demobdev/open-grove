@@ -346,8 +346,8 @@ export const processQueue = internalAction({
       for (const pr of groupItems) {
         let added = false;
         for (const batch of batches) {
-          const batchFiles = new Set(batch.flatMap(b => b.changedFiles));
-          const hasOverlap = pr.changedFiles.some(f => batchFiles.has(f));
+          const batchFiles = new Set(batch.flatMap((b: any) => b.changedFiles));
+          const hasOverlap = pr.changedFiles.some((f: any) => batchFiles.has(f));
           if (!hasOverlap) {
             batch.push(pr);
             added = true;
@@ -361,7 +361,7 @@ export const processQueue = internalAction({
 
       // For each batch, create merge batch in DB and create integration branch
       for (const batch of batches) {
-        const prNumbers = batch.map(b => b.prNumber);
+        const prNumbers = batch.map((b: any) => b.prNumber);
         const branchName = `og-merge-batch-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         
         const batchId = await ctx.runMutation(internal.mergeQueue.internalCreateBatch, {

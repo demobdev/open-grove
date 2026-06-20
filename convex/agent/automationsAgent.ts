@@ -4,6 +4,7 @@ import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { generateText } from "ai";
 import { chatModel } from "./models";
+import { vectorTools } from "./tools";
 
 export const runSkillAction = internalAction({
   args: {
@@ -19,6 +20,11 @@ export const runSkillAction = internalAction({
     });
     if (!skill) return;
 
+    const automation = await ctx.runQuery(internal.agent.automationsAgent.internalGetAutomation, {
+      automationId: args.automationId,
+    });
+    if (!automation) return;
+
     const runId = await ctx.runMutation(internal.agent.automationsAgent.internalCreateRun, {
       orgId: args.orgId,
       automationId: args.automationId,
@@ -27,10 +33,18 @@ export const runSkillAction = internalAction({
     });
 
     try {
+      const boundTools = Object.fromEntries(
+        Object.entries(vectorTools).map(([key, t]: [string, any]) => [
+          key,
+          { ...t, ctx: { ...ctx, orgId: args.orgId, requestUserId: automation.createdBy } }
+        ])
+      );
+
       const { text: result } = await generateText({
         model: chatModel,
         system: skill.content,
         prompt: `Execute the task for this incoming payload event:\n\n${JSON.stringify(args.payload, null, 2)}\n\nExecution mode is: ${args.executionMode}`,
+        tools: boundTools,
       });
 
       await ctx.runMutation(internal.agent.automationsAgent.internalUpdateRun, {
@@ -52,6 +66,13 @@ export const internalGetSkill = internalQuery({
   args: { skillId: v.id("skills") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.skillId);
+  },
+});
+
+export const internalGetAutomation = internalQuery({
+  args: { automationId: v.id("automations") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.automationId);
   },
 });
 

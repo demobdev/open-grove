@@ -1,6 +1,43 @@
 import { v } from "convex/values";
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { orgMutation, orgQuery } from "./lib/customFunctions";
+import { internal } from "./_generated/api";
+
+/** Handle incoming Slack slash commands/events. */
+export const handleSlackWebhook = internalAction({
+  args: { payload: v.any() },
+  handler: async (ctx, args) => {
+    if (args.payload.command === "/opengrove") {
+      const text = args.payload.text as string || "";
+      const userId = args.payload.user_id as string;
+      const channelId = args.payload.channel_id as string;
+
+      if (text.startsWith("create ")) {
+        const title = text.substring(7).trim();
+        if (!title) {
+          return new Response("Please provide an issue title: /opengrove create <title>", { status: 200 });
+        }
+
+        // Just create an automation or generic issue.
+        // We need an org to do this. We can use an environment variable for default org or we can't easily map slack workspace.
+        return new Response(JSON.stringify({
+          response_type: "in_channel",
+          text: `Command received: *${title}*. (Mapping Slack to OpenGrove orgs is WIP!)`
+        }), { 
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+      return new Response("Unknown command. Try: /opengrove create <title>", { status: 200 });
+    }
+
+    if (args.payload.challenge) {
+      return new Response(args.payload.challenge, { status: 200 });
+    }
+
+    return new Response(null, { status: 200 });
+  },
+});
 
 /** Save the Slack Webhook URL for the active organization in the connectedRepos table. */
 export const saveSlackWebhook = orgMutation({

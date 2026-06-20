@@ -5,7 +5,7 @@ import schema from "./schema.js";
 import { api } from "./_generated/api.js";
 
 test("getDashboardStats returns default empty metrics", async () => {
-  const t = convexTest(schema, import.meta.glob("./**/*.*s"));
+  const t = convexTest(schema, (import.meta as any).glob("./**/*.*s"));
   
   // Set up mock authenticated user and organization
   const userId = await t.run(async (ctx) => {
