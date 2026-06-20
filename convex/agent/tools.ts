@@ -768,7 +768,7 @@ const createSkill = createTool({
     required: ["name", "content"],
     additionalProperties: false,
   }),
-  execute: async (ctx: VectorToolCtx, input) => {
+  execute: async (ctx: VectorToolCtx, input): Promise<any> => {
     return await ctx.runMutation(internal.agent.data.createSkillForAgent, {
       orgId: ctx.orgId,
       actorUserId: ctx.requestUserId,
@@ -800,7 +800,7 @@ const createLoop = createTool({
     required: ["name", "actionSkillId", "validationSkillId"],
     additionalProperties: false,
   }),
-  execute: async (ctx: VectorToolCtx, input) => {
+  execute: async (ctx: VectorToolCtx, input): Promise<any> => {
     return await ctx.runMutation(internal.agent.data.createLoopForAgent, {
       orgId: ctx.orgId,
       actorUserId: ctx.requestUserId,

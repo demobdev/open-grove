@@ -1060,3 +1060,25 @@ export const getDashboardStats = orgQuery({
     };
   },
 });
+
+export const listOrgLabels = internalQuery({
+  args: { orgId: v.id("organizations") },
+  returns: v.array(
+    v.object({
+      labelId: v.id("labels"),
+      name: v.string(),
+      color: v.string(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const orgLabels = await ctx.db
+      .query("labels")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    return orgLabels.map((label: any) => ({
+      labelId: label._id,
+      name: label.name,
+      color: label.color,
+    }));
+  },
+});

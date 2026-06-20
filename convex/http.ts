@@ -115,6 +115,44 @@ http.route({
   }),
 });
 
+http.route({
+  path: "/slack-webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const contentType = request.headers.get("content-type") || "";
+    let payload: any;
+    
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      const text = await request.text();
+      payload = Object.fromEntries(new URLSearchParams(text).entries());
+    } else {
+      payload = await request.json();
+    }
+    
+    // Slack requires us to respond quickly, but handleSlackWebhook returns the response directly.
+    return await ctx.runAction(internal.slack.handleSlackWebhook, { payload });
+  }),
+});
+
+http.route({
+  path: "/discord-webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    // Basic signature verification logic would go here:
+    // const signature = request.headers.get("X-Signature-Ed25519");
+    // const timestamp = request.headers.get("X-Signature-Timestamp");
+    
+    let payload: any;
+    try {
+      payload = await request.json();
+    } catch {
+      return new Response("Invalid JSON", { status: 400 });
+    }
+    
+    return await ctx.runAction(internal.discord.handleDiscordWebhook, { payload });
+  }),
+});
+
 // ── External API (Phase 1) ────────────────────────────────────────────────
 
 /**

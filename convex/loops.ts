@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { orgMutation, orgQuery } from "./lib/customFunctions";
 import { assertCanCreateAutomation } from "./lib/limits";
+import { internalMutation } from "./_generated/server";
 
 export const startLoop = orgMutation({
   args: { loopId: v.id("loops") },
@@ -24,6 +25,37 @@ export const startLoop = orgMutation({
       orgId: ctx.org._id,
       loopRunId,
       feedbackContext: "",
+    });
+
+    return loopRunId;
+  },
+});
+
+export const internalStartLoop = internalMutation({
+  args: { 
+    loopId: v.id("loops"),
+    initialInput: v.optional(v.string())
+  },
+  handler: async (ctx, args) => {
+    const loop = await ctx.db.get(args.loopId);
+    if (!loop) {
+      throw new Error("Loop not found");
+    }
+
+    const loopRunId = await ctx.db.insert("loopRuns", {
+      orgId: loop.orgId,
+      loopId: args.loopId,
+      status: "running",
+      currentIteration: 1,
+      maxIterations: loop.maxIterations,
+      startedAt: Date.now(),
+    });
+
+    await ctx.scheduler.runAfter(0, internal.agent.loopOrchestrator.executeLoopIteration, {
+      orgId: loop.orgId,
+      loopRunId,
+      feedbackContext: "",
+      initialInput: args.initialInput,
     });
 
     return loopRunId;

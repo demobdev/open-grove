@@ -9,7 +9,10 @@ import {
   Play, Pause, Trash, CheckCircle2, Edit, MoreHorizontal, AlertCircle 
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
+import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAiAccess } from "@/components/ai/use-ai-access";
 import { CreateLoopDialog } from "@/components/loops/create-loop-dialog";
@@ -23,6 +26,7 @@ export default function LoopsPage() {
   const aiAccess = useAiAccess();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState(false);
 
   if (!aiAccess.hasAccess) {
     return (
@@ -42,6 +46,7 @@ export default function LoopsPage() {
   }
 
   const selectedLoop = loops?.find((l: any) => l._id === selectedId);
+  const runs = useQuery(api.loops.listRuns, selectedLoop ? { loopId: selectedLoop._id } : "skip");
 
   // --- DETAIL VIEW ---
   if (selectedLoop) {
@@ -64,20 +69,45 @@ export default function LoopsPage() {
               <span className="text-foreground font-medium">{selectedLoop.name}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                <Pause className="size-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                <Trash className="size-4" />
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+                      <Pause className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Pause Loop</TooltipContent>
+                </Tooltip>
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-rose-500 transition-colors">
+                      <Trash className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete Loop</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
               <Button 
                 variant="secondary" 
                 size="sm" 
-                className="ml-2 font-medium bg-indigo-500 hover:bg-indigo-600 text-white"
-                onClick={() => startLoop({ loopId: selectedLoop._id })}
+                className="ml-2 font-medium bg-indigo-500 hover:bg-indigo-600 text-white transition-all shadow-md shadow-indigo-500/20"
+                disabled={isStarting}
+                onClick={async () => {
+                  setIsStarting(true);
+                  try {
+                    await startLoop({ loopId: selectedLoop._id });
+                    toast.success("Loop manually started! It is now running in the background.");
+                  } catch (e: any) {
+                    toast.error(`Failed to start loop: ${e.message}`);
+                  } finally {
+                    setIsStarting(false);
+                  }
+                }}
               >
-                <Repeat className="size-3.5 mr-2" fill="currentColor" />
-                Run loop now
+                <Repeat className={`size-3.5 mr-2 ${isStarting ? "animate-spin" : ""}`} fill="currentColor" />
+                {isStarting ? "Starting..." : "Run loop now"}
               </Button>
             </div>
           </div>
@@ -125,7 +155,7 @@ export default function LoopsPage() {
                     <span className="text-muted-foreground">Status</span>
                     <span className="flex items-center gap-2 font-medium">
                       <div className={`size-2 rounded-full ${selectedLoop.isEnabled ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]' : 'bg-muted-foreground'}`} />
-                      {selectedLoop.isEnabled ? 'Active' : 'Disabled'}
+                      {selectedLoop.isEnabled ? 'Listening (Enabled)' : 'Disabled'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -143,27 +173,43 @@ export default function LoopsPage() {
               <div className="space-y-4">
                 <h3 className="text-sm font-medium text-muted-foreground">Recent runs</h3>
                 <div className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between group cursor-pointer hover:bg-muted/30 -mx-2 px-2 py-1 rounded">
-                    <span className="flex items-center gap-2 font-medium text-emerald-500">
-                      <CheckCircle2 className="size-4 transition-colors" /> 
-                      Goal Reached
-                    </span>
-                    <span className="text-muted-foreground">2m</span>
-                  </div>
-                  <div className="flex items-center justify-between group cursor-pointer hover:bg-muted/30 -mx-2 px-2 py-1 rounded">
-                    <span className="flex items-center gap-2 font-medium text-rose-500">
-                      <AlertCircle className="size-4 transition-colors" /> 
-                      Max Iterations
-                    </span>
-                    <span className="text-muted-foreground">1h</span>
-                  </div>
-                  <div className="flex items-center justify-between group cursor-pointer hover:bg-muted/30 -mx-2 px-2 py-1 rounded">
-                    <span className="flex items-center gap-2 font-medium text-emerald-500">
-                      <CheckCircle2 className="size-4 transition-colors" /> 
-                      Goal Reached
-                    </span>
-                    <span className="text-muted-foreground">1d</span>
-                  </div>
+                  {runs === undefined ? (
+                    <div className="text-muted-foreground text-xs">Loading...</div>
+                  ) : runs.length === 0 ? (
+                    <div className="text-muted-foreground text-xs italic">No runs yet</div>
+                  ) : runs.map((run: any) => (
+                    <div key={run._id} className="group -mx-2 px-2 py-2 rounded hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center justify-between cursor-pointer">
+                        <span className="flex items-center gap-2 font-medium capitalize text-foreground">
+                          {run.status === "succeeded" && <CheckCircle2 className="size-4 text-emerald-500" />}
+                          {run.status === "failed" && <AlertCircle className="size-4 text-rose-500" />}
+                          {run.status === "running" && (
+                            <div className="relative flex h-4 w-4 items-center justify-center">
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75"></span>
+                              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-500"></span>
+                            </div>
+                          )}
+                          {run.status === "stopped" && <AlertCircle className="size-4 text-orange-500" />}
+                          {run.status.replace(/_/g, ' ')}
+                        </span>
+                        <span className="text-muted-foreground text-xs">
+                          {formatDistanceToNow(run.startedAt, { addSuffix: true })}
+                        </span>
+                      </div>
+                      
+                      {run.error && (
+                        <div className="mt-2 text-xs text-rose-500 bg-rose-500/10 p-2 rounded whitespace-pre-wrap font-mono">
+                          {run.error}
+                        </div>
+                      )}
+                      
+                      {run.resultSummary && (
+                        <div className="mt-2 text-xs text-muted-foreground bg-muted p-2 rounded whitespace-pre-wrap">
+                          {run.resultSummary}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -235,23 +281,47 @@ export default function LoopsPage() {
                   </div>
                   
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="size-8 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startLoop({ loopId: loop._id });
-                      }}
-                    >
-                      <Play className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground">
-                      <Edit className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground">
-                      <MoreHorizontal className="size-4" />
-                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="size-8 text-muted-foreground hover:text-indigo-500 transition-colors"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await startLoop({ loopId: loop._id });
+                                toast.success("Loop manually started! It is now running in the background.");
+                              } catch (err: any) {
+                                toast.error(`Failed to start: ${err.message}`);
+                              }
+                            }}
+                          >
+                            <Play className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Run manually</TooltipContent>
+                      </Tooltip>
+                      
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground">
+                            <Edit className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Edit settings</TooltipContent>
+                      </Tooltip>
+                      
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-foreground">
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>More options</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
               ))}

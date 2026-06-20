@@ -6,6 +6,7 @@ import { vectorAgent, VECTOR_INSTRUCTIONS } from "./vectorAgent";
 import { threadUserKey } from "./limiter";
 import { chatModel } from "./models";
 import { generateText, Output, jsonSchema } from "ai";
+import { vectorTools } from "./tools";
 
 /**
  * Starts a new execution of a Loop.
@@ -50,6 +51,7 @@ export const executeLoopIteration = internalAction({
     orgId: v.id("organizations"),
     loopRunId: v.id("loopRuns"),
     feedbackContext: v.string(), // Feedback from previous validation failures
+    initialInput: v.optional(v.string()), // Payload from webhook
   },
   handler: async (ctx, args) => {
     // 1. Fetch Context
@@ -81,12 +83,24 @@ export const executeLoopIteration = internalAction({
 
     try {
       // 2. Action Phase
+      const basePrompt = args.initialInput 
+        ? `Execute the task described in the system instructions. Use the following input:\n${args.initialInput}` 
+        : `Execute the task described in the system instructions.`;
+        
+      const boundTools = Object.fromEntries(
+        Object.entries(vectorTools).map(([key, t]: [string, any]) => [
+          key,
+          { ...t, ctx: { ...ctx, orgId: loop.orgId, requestUserId: loop.createdBy } }
+        ])
+      );
+
       const { text: actionResult } = await generateText({
         model: chatModel,
         system: actionSkill.content,
         prompt: args.feedbackContext 
-          ? `Previous validation feedback: ${args.feedbackContext}\n\nPlease revise your output.`
-          : `Execute the task described in the system instructions.`,
+          ? `${basePrompt}\n\nPrevious validation feedback: ${args.feedbackContext}\n\nPlease revise your output.`
+          : basePrompt,
+        tools: boundTools,
       });
 
       // 3. Validation Phase

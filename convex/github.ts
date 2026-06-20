@@ -143,6 +143,34 @@ export const handleGithubEvent = internalMutation({
           });
         }
       }
+
+      // ── LOOPS TRIGGER (Phase 7) ──
+      // If a PR is opened or updated, see if there's an active "PR Code Reviewer" loop
+      if (args.event === "pull_request" && (action === "opened" || action === "synchronize" || action === "reopened")) {
+        const loops = await ctx.db
+          .query("loops")
+          .withIndex("by_org", (q) => q.eq("orgId", conn.orgId))
+          .collect();
+          
+        // Find a loop that looks like it's meant for PR Code Review
+        const reviewerLoop = loops.find(l => 
+          l.isEnabled && 
+          (l.name.toLowerCase().includes("reviewer") || l.name.toLowerCase().includes("pr"))
+        );
+        
+        if (reviewerLoop) {
+          // Trigger the loop
+          await ctx.scheduler.runAfter(0, internal.loops.internalStartLoop, {
+            loopId: reviewerLoop._id,
+            initialInput: JSON.stringify({
+              prUrl: prUrl,
+              prTitle: prTitle,
+              prNumber: prNumber,
+              action: action
+            })
+          });
+        }
+      }
     }
 
     const issueKeys = extractIssueKeys(textToScan);

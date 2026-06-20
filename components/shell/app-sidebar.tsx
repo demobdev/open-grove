@@ -146,6 +146,12 @@ export function AppSidebar() {
           >
             Cycles
           </NavLink>
+          <NavLink
+            href={`${base}/analytics`}
+            icon={<Zap className="size-4" />}
+          >
+            Analytics
+          </NavLink>
           <NavLink href={`${base}/ai`} icon={<Bot className="size-4" />}>
             AI Agent
           </NavLink>

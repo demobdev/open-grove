@@ -69,11 +69,11 @@ export const backfillOrgEmbeddings = internalAction({
     }
     const { embeddings } = await embedMany({
       model: embeddingModel,
-      values: batch.map((item) => item.text.slice(0, 8000)),
+      values: batch.map((item: any) => item.text.slice(0, 8000)),
     });
     await ctx.runMutation(internal.agent.data.saveIssueEmbeddings, {
       orgId: args.orgId,
-      items: batch.map((item, index) => ({
+      items: batch.map((item: any, index: number) => ({
         issueId: item.issueId,
         embedding: embeddings[index],
       })),

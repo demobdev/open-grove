@@ -27,7 +27,7 @@ const TEMPLATES = {
       name: "Code Reviewer",
       slug: "code-reviewer",
       type: "review" as const,
-      content: "You are a senior software engineer. Read the provided git diff. Check for security vulnerabilities, performance issues, and adherence to standard coding conventions. Provide specific, constructive feedback.",
+      content: "You are a senior software engineer. Read the provided git diff. Check for security vulnerabilities, performance issues, and adherence to standard coding conventions. Provide specific, constructive feedback. Use the `postPRComment` tool to post your review directly to the GitHub PR.",
     },
     validationSkill: {
       name: "Review Validator",

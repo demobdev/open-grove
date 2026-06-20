@@ -32,17 +32,23 @@ import { Switch } from "@/components/ui/switch";
 
 export function CreateLoopDialog({
   children,
+  initialActionSkillId = "",
+  initialName = "",
+  initialDescription = "",
 }: {
   children?: React.ReactNode;
+  initialActionSkillId?: string;
+  initialName?: string;
+  initialDescription?: string;
 }) {
   const [open, setOpen] = useState(false);
   const createLoop = useMutation(api.loops.createLoop);
   const skills = useQuery(api.skills.listSkills);
 
   const [loading, setLoading] = useState(false);
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [actionSkillId, setActionSkillId] = useState<string>("");
+  const [name, setName] = useState(initialName);
+  const [description, setDescription] = useState(initialDescription);
+  const [actionSkillId, setActionSkillId] = useState<string>(initialActionSkillId);
   const [validationSkillId, setValidationSkillId] = useState<string>("");
   const [maxIterations, setMaxIterations] = useState<string>("5");
   const [isEnabled, setIsEnabled] = useState(true);

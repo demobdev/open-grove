@@ -50,6 +50,10 @@ export default function IntegrationsSettingsPage() {
   const saveSlackWebhook = useMutation(api.slack.saveSlackWebhook);
   const sendTestMessage = useAction(api.slack.sendTestMessage);
 
+  const discordWebhook = useQuery(api.discord.getDiscordWebhook);
+  const saveDiscordWebhook = useMutation(api.discord.saveDiscordWebhook);
+  const sendDiscordTestMessage = useAction(api.discord.sendTestMessage);
+
   const [copied, setCopied] = useState(false);
   const [githubRepos, setGithubRepos] = useState<GitHubRepo[]>([]);
   const [loadingRepos, setLoadingRepos] = useState(true);
@@ -61,6 +65,10 @@ export default function IntegrationsSettingsPage() {
   const [slackUrl, setSlackUrl] = useState("");
   const [savingSlack, setSavingSlack] = useState(false);
   const [testingSlack, setTestingSlack] = useState(false);
+
+  const [discordUrl, setDiscordUrl] = useState("");
+  const [savingDiscord, setSavingDiscord] = useState(false);
+  const [testingDiscord, setTestingDiscord] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -99,9 +107,13 @@ export default function IntegrationsSettingsPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSlackUrl(slackWebhook ?? "");
     }
-  }, [slackWebhook]);
+    if (discordWebhook !== undefined) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDiscordUrl(discordWebhook ?? "");
+    }
+  }, [slackWebhook, discordWebhook]);
 
-  if (org === undefined || connectedRepos === undefined || slackWebhook === undefined) {
+  if (org === undefined || connectedRepos === undefined || slackWebhook === undefined || discordWebhook === undefined) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -186,8 +198,42 @@ export default function IntegrationsSettingsPage() {
     }
   };
 
-  // Filter connectedRepos to exclude Slack webhooks
-  const gitRepos = connectedRepos.filter((r) => !r.repoName.startsWith("slack:"));
+  const handleSaveDiscord = async () => {
+    setSavingDiscord(true);
+    try {
+      await saveDiscordWebhook({ webhookUrl: discordUrl });
+      toast.success("Discord Webhook URL saved successfully");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save Discord Webhook");
+    } finally {
+      setSavingDiscord(false);
+    }
+  };
+
+  const handleTestDiscord = async () => {
+    if (!discordUrl) {
+      toast.error("Please enter a Webhook URL first");
+      return;
+    }
+    setTestingDiscord(true);
+    try {
+      const res = await sendDiscordTestMessage({ webhookUrl: discordUrl });
+      if (res.success) {
+        toast.success("Test notification sent successfully to Discord!");
+      } else {
+        toast.error(`Failed to send test message: ${res.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to send test message");
+    } finally {
+      setTestingDiscord(false);
+    }
+  };
+
+  // Filter connectedRepos to exclude Slack and Discord webhooks
+  const gitRepos = connectedRepos.filter((r) => !r.repoName.startsWith("slack:") && !r.repoName.startsWith("discord:"));
   const connectedNames = new Set(gitRepos.map((r) => r.repoName));
   const availableRepos = githubRepos.filter((r) => !connectedNames.has(r.fullName));
 
@@ -481,6 +527,79 @@ export default function IntegrationsSettingsPage() {
                   disabled={testingSlack}
                 >
                   {testingSlack ? (
+                    <Loader2 className="size-3 animate-spin" />
+                  ) : (
+                    <Send className="size-3" />
+                  )}
+                  Send Test Message
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Discord Webhook Integration */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-4">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-indigo-500/10 ring-1 ring-indigo-500/20">
+            <MessageSquare className="size-6 text-indigo-500" />
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <CardTitle>Discord Notifications</CardTitle>
+            <CardDescription>
+              Post notifications to a Discord channel when issues are updated or use /opengrove in Discord.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 pt-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-medium text-foreground">
+              Discord Webhook URL
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={discordUrl}
+                onChange={(e) => setDiscordUrl(e.target.value)}
+                placeholder="https://discord.com/api/webhooks/..."
+                className="flex-1 rounded-md border bg-background px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <Button
+                size="sm"
+                className="h-8 gap-1.5 text-xs px-3 bg-indigo-500 hover:bg-indigo-600 text-white"
+                onClick={handleSaveDiscord}
+                disabled={savingDiscord}
+              >
+                {savingDiscord ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  "Save Webhook"
+                )}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              To obtain a URL, go to your Discord Server settings, navigate to Integrations, and create a Webhook.
+            </p>
+          </div>
+
+          {discordWebhook && (
+            <div className="flex flex-col gap-2 border-t pt-4">
+              <label className="text-xs font-medium text-foreground">
+                Testing Utility
+              </label>
+              <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/5">
+                <span className="text-[11px] text-muted-foreground">
+                  Send a sample notification message to verify your connection works.
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1.5 text-[11px] px-2.5"
+                  onClick={handleTestDiscord}
+                  disabled={testingDiscord}
+                >
+                  {testingDiscord ? (
                     <Loader2 className="size-3 animate-spin" />
                   ) : (
                     <Send className="size-3" />

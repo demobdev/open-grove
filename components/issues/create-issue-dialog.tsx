@@ -1,9 +1,10 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { Sparkles, CopyMinus, Loader2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,8 @@ export function CreateIssueDialog({
   const router = useRouter();
   const teams = useQuery(api.teams.list, open ? {} : "skip");
   const createIssue = useMutation(api.issues.create);
+  const findDuplicates = useAction(api.agent.triage.findDuplicatesFromText);
+  const suggestTriage = useAction(api.agent.triage.suggestTriageFromText);
 
   const [selectedTeamId, setSelectedTeamId] = useState<
     Id<"teams"> | undefined
@@ -53,6 +56,54 @@ export function CreateIssueDialog({
   const [status, setStatus] = useState<IssueStatus>("todo");
   const [priority, setPriority] = useState<IssuePriority>("none");
   const [submitting, setSubmitting] = useState(false);
+
+  // AI State
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [duplicates, setDuplicates] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [aiSuggestion, setAiSuggestion] = useState<any>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setDuplicates([]);
+      setAiSuggestion(null);
+      setIsAiLoading(false);
+      return;
+    }
+    const text = title + " " + description;
+    if (text.trim().length < 10) {
+      setDuplicates([]);
+      setAiSuggestion(null);
+      setIsAiLoading(false);
+      return;
+    }
+
+    setIsAiLoading(true);
+    const handler = setTimeout(async () => {
+      try {
+        const [dupRes, triageRes] = await Promise.all([
+          findDuplicates({ title, description: description.trim() || undefined }),
+          suggestTriage({ title, description: description.trim() || undefined }),
+        ]);
+        if (dupRes.ok) {
+           setDuplicates(dupRes.duplicates);
+        }
+        if (triageRes.ok) {
+           setAiSuggestion({
+             priority: triageRes.priority,
+             labels: triageRes.labels,
+             reasoning: triageRes.reasoning,
+           });
+        }
+      } catch (err) {
+        console.error("AI actions failed", err);
+      } finally {
+        setIsAiLoading(false);
+      }
+    }, 800);
+    return () => clearTimeout(handler);
+  }, [title, description, open, findDuplicates, suggestTriage]);
 
   // Fall back to the default/first team without needing an effect.
   const teamId = selectedTeamId ?? defaultTeamId ?? teams?.[0]?._id;
@@ -164,6 +215,48 @@ export function CreateIssueDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {/* AI Duplicates & Suggestions */}
+          {duplicates.length > 0 && (
+            <div className="mt-2 flex flex-col gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-sm">
+              <div className="flex items-center gap-2 font-medium text-amber-500">
+                <CopyMinus className="h-4 w-4" />
+                <span>Possible duplicates found</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                {duplicates.map((dup) => (
+                  <div key={dup.issueId} className="flex items-center gap-2 text-muted-foreground">
+                    <span className="font-mono text-xs">{dup.identifier}</span>
+                    <span className="truncate">{dup.title}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {aiSuggestion && aiSuggestion.priority !== "none" && priority === "none" && (
+            <div 
+              className="mt-2 flex cursor-pointer items-center gap-2 rounded-md border border-indigo-500/20 bg-indigo-500/10 p-3 text-sm transition-colors hover:bg-indigo-500/20"
+              onClick={() => setPriority(aiSuggestion.priority)}
+            >
+              <Sparkles className="h-4 w-4 text-indigo-500" />
+              <div className="flex flex-col">
+                <span className="font-medium text-indigo-500">
+                  AI Suggests: {aiSuggestion.priority} Priority
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {aiSuggestion.reasoning} (Click to apply)
+                </span>
+              </div>
+            </div>
+          )}
+
+          {isAiLoading && !duplicates.length && !aiSuggestion && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>AI is analyzing...</span>
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
