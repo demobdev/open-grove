@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
+import { internalAction, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { logActivity } from "./lib/activity";
 import { orgAdminMutation } from "./lib/customFunctions";
 
@@ -354,5 +356,121 @@ export const demoData = orgAdminMutation({
       issues: issueCount,
       comments: commentCount,
     };
+  },
+});
+
+export const fetchAndSeedLoops = internalAction({
+  args: {},
+  handler: async (ctx, args) => {
+    // Get default org and user to attach loops to
+    const defaultData = await ctx.runMutation(internal.seed.getDefaultData);
+    if (!defaultData) {
+      console.error("No organizations or users found. Please create one in the UI first.");
+      return { success: false, error: "No org/user found" };
+    }
+
+    console.log("Fetching loop library from Forward Future...");
+    const res = await fetch("https://signals.forwardfuture.ai/loop-library/catalog.json");
+    if (!res.ok) {
+      throw new Error(`Failed to fetch loops: ${res.status} ${res.statusText}`);
+    }
+
+    const catalog = await res.json();
+    const loops = catalog.loops;
+
+    if (!Array.isArray(loops)) {
+      throw new Error("Invalid catalog format: loops is not an array");
+    }
+
+    console.log(`Found ${loops.length} loops. Inserting into DB...`);
+    
+    let inserted = 0;
+    for (const loop of loops) {
+      const { slug, title, description, prompt, category } = loop;
+      
+      const skillTypeMap: Record<string, string> = {
+        engineering: "custom",
+        evaluation: "review",
+        operations: "custom",
+        content: "docs",
+        design: "custom",
+      };
+      
+      const skillType = skillTypeMap[category?.slug || ""] || "custom";
+
+      await ctx.runMutation(internal.seed.insertSkill, {
+        orgId: defaultData.orgId,
+        userId: defaultData.userId,
+        name: title,
+        slug: slug,
+        description: description,
+        type: skillType,
+        content: prompt,
+      });
+      inserted++;
+    }
+
+    return { success: true, count: inserted };
+  },
+});
+
+export const insertSkill = internalMutation({
+  args: {
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    name: v.string(),
+    slug: v.string(),
+    description: v.optional(v.string()),
+    type: v.string(),
+    content: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Check if skill already exists for this org
+    const existing = await ctx.db
+      .query("skills")
+      .withIndex("by_org_and_slug", (q) => q.eq("orgId", args.orgId).eq("slug", args.slug))
+      .first();
+
+    if (existing) {
+      console.log(`Skill ${args.slug} already exists. Updating...`);
+      await ctx.db.patch(existing._id, {
+        name: args.name,
+        description: args.description,
+        type: args.type as any,
+        content: args.content,
+        updatedAt: Date.now(),
+      });
+      return;
+    }
+
+    console.log(`Inserting new skill ${args.slug}...`);
+    await ctx.db.insert("skills", {
+      orgId: args.orgId,
+      name: args.name,
+      slug: args.slug,
+      description: args.description,
+      type: args.type === "workflow" ? "custom" : args.type as "review" | "docs" | "custom",
+      content: args.content,
+      priority: 0,
+      isEnabled: true,
+      version: 1,
+      createdBy: args.userId,
+      updatedAt: Date.now(),
+      scope: {}, // Apply to everything
+    });
+  },
+});
+
+export const getDefaultData = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const org = await ctx.db.query("organizations").first();
+    const user = await ctx.db.query("users").first();
+
+    if (!org || !user) {
+      return null;
+    }
+
+    return { orgId: org._id, userId: user._id };
   },
 });
