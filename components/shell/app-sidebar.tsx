@@ -33,6 +33,7 @@ import { CreateTeamDialog } from "@/components/teams/create-team-dialog";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "./theme-toggle";
 import { HelpDialog } from "./help-dialog";
+import { LocalExplorer } from "./local-explorer";
 
 function NavLink({
   href,
@@ -161,6 +162,18 @@ export function AppSidebar() {
             Merge Queue
           </NavLink>
         </nav>
+
+        <Collapsible defaultOpen className="pb-4">
+          <div className="flex items-center justify-between">
+            <CollapsibleTrigger className="flex items-center gap-1 py-1 text-xs font-medium text-muted-foreground hover:text-foreground">
+              Local Workspace
+              <ChevronDown className="size-3" />
+            </CollapsibleTrigger>
+          </div>
+          <CollapsibleContent className="pt-1">
+            <LocalExplorer basePath="/Users/demariasbailey/open-grove" />
+          </CollapsibleContent>
+        </Collapsible>
 
         <Collapsible defaultOpen className="pb-4">
           <div className="flex items-center justify-between">

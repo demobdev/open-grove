@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { httpRouter } from "convex/server";
 import { Webhook } from "svix";
 import { internal } from "./_generated/api";

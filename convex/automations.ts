@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { v } from "convex/values";
 import { orgMutation, orgQuery } from "./lib/customFunctions";
 import { assertCanCreateAutomation } from "./lib/limits";

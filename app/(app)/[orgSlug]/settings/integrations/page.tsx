@@ -14,6 +14,7 @@ import {
   MessageSquare,
   Send,
   ChevronDown,
+  RefreshCcw,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -224,13 +225,25 @@ export default function IntegrationsSettingsPage() {
                 Loading your GitHub repositories...
               </div>
             ) : reposError === "not_linked" ? (
-              <div className="flex flex-col gap-3 rounded-lg border border-dashed p-4 bg-muted/10">
-                <p className="text-xs text-muted-foreground">
-                  Your GitHub account is not connected to your profile. Click your profile avatar in the bottom-left corner of the sidebar, go to **Manage Account**, and link your **GitHub** account under **Social accounts** to list your repositories.
-                </p>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground">Once connected, refresh this page to list your repositories.</span>
+              <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed p-8 bg-muted/5 text-center">
+                <div className="flex size-12 items-center justify-center rounded-full bg-muted">
+                  <GitBranch className="size-6 text-muted-foreground" />
                 </div>
+                <div className="flex flex-col gap-1.5 max-w-sm">
+                  <h3 className="text-sm font-semibold text-foreground">Connect your GitHub account</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Click your profile avatar in the bottom-left corner of the sidebar, go to <strong>Manage Account</strong>, and link your <strong>GitHub</strong> account under <strong>Social accounts</strong>.
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-8 gap-2 text-xs mt-2"
+                  onClick={() => window.location.reload()}
+                >
+                  <RefreshCcw className="size-3.5" />
+                  Refresh Page
+                </Button>
               </div>
             ) : reposError ? (
               <div className="text-xs text-red-500 h-9 border border-red-500/20 rounded-md px-3 flex items-center bg-red-500/5">

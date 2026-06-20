@@ -109,3 +109,21 @@
 ## Verification
 - [x] `pnpm exec tsc --noEmit` passes
 - [x] `pnpm lint` passes
+
+# Tasks: Phase 6 — Agentic Merge Queue
+
+## Database Schema
+- [ ] Update `mergeQueueItems` table (idempotencyKey, targetBranch, PR metadata, changedFiles)
+- [x] Create/update `docs/agent/implementation_plan.md` outlining the V1 architecture for the Agentic Merge Queue.
+- [x] Seek human approval for the plan before executing (specifically the `mergeBatches` and `mergeQueueItems` schema additions).
+- [x] Make necessary Phase 6 schema changes.
+- [x] Implement deterministic file overlap detection and batch PR logic.
+- [x] Hook the merge queue up to CI webhook events.
+- [x] Integrate human approval step (`awaiting_approval` status) before merge.`convex/agent/mergeTools.ts` to guarantee GitHub App tokens
+
+## Frontend UI
+- [ ] Update `app/(app)/[orgSlug]/merge-queue/page.tsx` with human approval buttons (Approve, Cancel, Merge) and CI link
+
+## Verification
+- [ ] `pnpm exec tsc --noEmit` passes
+- [ ] `pnpm lint` passes

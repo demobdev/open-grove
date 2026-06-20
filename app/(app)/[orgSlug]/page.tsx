@@ -32,6 +32,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { DashboardOverview } from "@/components/dashboard/dashboard-overview";
 
 /** Custom GitHub icon — lucide-react removed brand icons in v1 */
 function GitHubIcon({ className }: { className?: string }) {
@@ -164,12 +165,6 @@ export default function WorkspaceHomePage() {
       setLinkingGithub(false);
     }
   };
-
-  useEffect(() => {
-    if (teams && teams.length > 0) {
-      router.replace(`/${params.orgSlug}/team/${teams[0]._id}`);
-    }
-  }, [teams, router, params.orgSlug]);
 
   useEffect(() => {
     if (step === 2 && githubRepos.length === 0 && !loadingRepos) {
@@ -565,10 +560,14 @@ export default function WorkspaceHomePage() {
               </button>
             </div>
           )}
-
         </div>
       </div>
     );
+  }
+
+  // If teams exist, render the dashboard
+  if (teams.length > 0) {
+    return <DashboardOverview />;
   }
 
   return null;

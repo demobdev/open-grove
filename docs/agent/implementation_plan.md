@@ -293,15 +293,6 @@ All tools will be registered under `vectorTools` so they are discoverable by the
 
 ---
 
-## Phase 6: Agentic Merge Queue (NEW)
-
-**Goal:** Implement the Agentic Merge Queue to solve the "commit lock" problem by detecting conflict-free PRs, grouping them into an integration branch, testing them together via CI, and merging them as a batch. This reduces GitHub Actions / Vercel build costs and unblocks parallel agent output.
-
-### User Review Required
-
-> [!WARNING]
-> The OpenGrove golden rules state that `convex/schema.ts` is frozen. However, Phase 6 requires two new tables: `mergeQueueItems` and `mergeBatches` to track the lifecycle of queued PRs and integration branches. I need your explicit permission to add these tables to `convex/schema.ts`.
-
 ### Open Questions
 > [!IMPORTANT]
 > 1. **Schema Modifications:** `mergeQueueItems` and `mergeBatches` are approved for Phase 6. I will add them when I start Phase 6.

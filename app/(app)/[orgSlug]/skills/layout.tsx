@@ -5,4 +5,10 @@ export const metadata: Metadata = {
   description: "Define prompts, quality gates, and automated workflows.",
 };
 
-export { default } from "./page";
+export default function SkillsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <>{children}</>;
+}

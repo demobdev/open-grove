@@ -1,6 +1,34 @@
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import { orgMutation, orgQuery } from "./lib/customFunctions";
 import { assertCanCreateAutomation } from "./lib/limits";
+
+export const startLoop = orgMutation({
+  args: { loopId: v.id("loops") },
+  handler: async (ctx, args) => {
+    const loop = await ctx.db.get(args.loopId);
+    if (!loop || loop.orgId !== ctx.org._id) {
+      throw new Error("Loop not found");
+    }
+
+    const loopRunId = await ctx.db.insert("loopRuns", {
+      orgId: ctx.org._id,
+      loopId: args.loopId,
+      status: "running",
+      currentIteration: 1,
+      maxIterations: loop.maxIterations,
+      startedAt: Date.now(),
+    });
+
+    await ctx.scheduler.runAfter(0, internal.agent.loopOrchestrator.executeLoopIteration, {
+      orgId: ctx.org._id,
+      loopRunId,
+      feedbackContext: "",
+    });
+
+    return loopRunId;
+  },
+});
 
 export const listLoops = orgQuery({
   args: {},

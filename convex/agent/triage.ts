@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Output, generateText, jsonSchema } from "ai";
 import { Infer, v } from "convex/values";
 import { internal } from "../_generated/api";

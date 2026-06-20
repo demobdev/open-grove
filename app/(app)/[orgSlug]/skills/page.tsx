@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Brain } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import { CreateSkillDialog } from "@/components/skills/create-skill-dialog";
 
 export default function SkillsPage() {
   const { orgSlug } = useParams<{ orgSlug: string }>();
+  const router = useRouter();
   const skills = useQuery(api.skills.listSkills);
   const aiAccess = useAiAccess();
 
@@ -52,7 +54,16 @@ export default function SkillsPage() {
               The Org Brain. Define prompts, quality gates, and automated workflows.
             </p>
           </div>
-          <CreateSkillDialog />
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              className="shadow-sm" 
+              onClick={() => router.push(`/${orgSlug}/skills/library`)}
+            >
+              Browse Library
+            </Button>
+            <CreateSkillDialog />
+          </div>
         </div>
 
         {skills === undefined ? (
@@ -78,11 +89,20 @@ export default function SkillsPage() {
             <p className="text-muted-foreground max-w-sm mb-6">
               Create your first skill to teach the agent about your organization&apos;s specific requirements.
             </p>
-            <CreateSkillDialog>
-              <Button variant="outline" className="transition-all hover:bg-muted/80">
-                Create your first skill
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="outline" 
+                className="transition-all hover:bg-muted/80"
+                onClick={() => router.push(`/${orgSlug}/skills/library`)}
+              >
+                Browse Library
               </Button>
-            </CreateSkillDialog>
+              <CreateSkillDialog>
+                <Button className="transition-all shadow-sm">
+                  Create your first skill
+                </Button>
+              </CreateSkillDialog>
+            </div>
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

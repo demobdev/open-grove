@@ -9,6 +9,7 @@ import {
 } from "../_generated/server";
 import { logActivity } from "../lib/activity";
 import { getAuthContext } from "../lib/auth";
+import { orgQuery } from "../lib/customFunctions";
 import { assertCanCreateIssue, hasAiAccess } from "../lib/limits";
 import { getOrgIssue } from "../issues";
 import {
@@ -913,5 +914,149 @@ export const issueSummariesByIdentifiers = internalQuery({
       summaries.push(await summarizeIssue(ctx, issue, teamKeys));
     }
     return summaries;
+  },
+});
+
+// ── Agentic creation tools ──────────────────────────────────────────────────
+
+export const createSkillForAgent = internalMutation({
+  args: {
+    orgId: v.id("organizations"),
+    actorUserId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    type: v.union(
+      v.literal("triage"),
+      v.literal("review"),
+      v.literal("docs"),
+      v.literal("security"),
+      v.literal("style"),
+      v.literal("release"),
+      v.literal("custom")
+    ),
+    content: v.string(),
+  },
+  returns: v.object({
+    skillId: v.id("skills"),
+  }),
+  handler: async (ctx, args) => {
+    const org = await ctx.db.get(args.orgId);
+    if (!org) throw new Error("Organization not found");
+    const slug = args.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    
+    const existing = await ctx.db
+      .query("skills")
+      .withIndex("by_org_and_slug", (q) =>
+        q.eq("orgId", args.orgId).eq("slug", slug)
+      )
+      .first();
+
+    if (existing) {
+      throw new Error(`A skill with slug "${slug}" already exists. Try a different name.`);
+    }
+
+    const skillId = await ctx.db.insert("skills", {
+      orgId: args.orgId,
+      name: args.name,
+      slug,
+      description: args.description,
+      type: args.type,
+      scope: {},
+      content: args.content,
+      priority: 10,
+      isEnabled: true,
+      version: 1,
+      createdBy: args.actorUserId,
+      updatedAt: Date.now(),
+    });
+
+    return { skillId };
+  },
+});
+
+export const createLoopForAgent = internalMutation({
+  args: {
+    orgId: v.id("organizations"),
+    actorUserId: v.id("users"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    actionSkillId: v.id("skills"),
+    validationSkillId: v.id("skills"),
+    maxIterations: v.number(),
+  },
+  returns: v.object({
+    loopId: v.id("loops"),
+  }),
+  handler: async (ctx, args) => {
+    const loopId = await ctx.db.insert("loops", {
+      orgId: args.orgId,
+      name: args.name,
+      description: args.description,
+      actionSkillId: args.actionSkillId,
+      validationSkillId: args.validationSkillId,
+      maxIterations: args.maxIterations,
+      isEnabled: true,
+      createdBy: args.actorUserId,
+      updatedAt: Date.now(),
+    });
+
+    return { loopId };
+  },
+});
+
+export const getDashboardStats = orgQuery({
+  args: {},
+  handler: async (ctx) => {
+    const loops = await ctx.db
+      .query("loops")
+      .withIndex("by_org", (q) => q.eq("orgId", ctx.org._id))
+      .collect();
+
+    const skills = await ctx.db
+      .query("skills")
+      .withIndex("by_org", (q) => q.eq("orgId", ctx.org._id))
+      .collect();
+
+    const loopRuns = await ctx.db
+      .query("loopRuns")
+      .withIndex("by_org", (q) => q.eq("orgId", ctx.org._id))
+      .order("desc")
+      .take(10);
+      
+    const pendingBatches = await ctx.db
+      .query("mergeBatches")
+      .withIndex("by_org_and_status", (q) => q.eq("orgId", ctx.org._id).eq("status", "awaiting_approval"))
+      .collect();
+
+    const myIssues = await ctx.db
+      .query("issues")
+      .withIndex("by_assignee", (q) => q.eq("orgId", ctx.org._id).eq("assigneeId", ctx.user._id))
+      .order("desc")
+      .take(5);
+
+    const issuesWithTeam = await Promise.all(
+      myIssues.map(async (issue) => {
+        const team = await ctx.db.get(issue.teamId);
+        return {
+          ...issue,
+          teamKey: team?.key ?? "UNK",
+        };
+      })
+    );
+
+    return {
+      activeLoopsCount: loops.filter(l => l.isEnabled).length,
+      totalSkillsCount: skills.length,
+      pendingBatchesCount: pendingBatches.length,
+      totalRunsCount: loopRuns.length,
+      recentActivity: loopRuns.map(r => ({
+        id: r._id,
+        loopId: r.loopId,
+        status: r.status,
+        startedAt: r.startedAt,
+        completedAt: r.completedAt,
+      })),
+      myIssues: issuesWithTeam,
+    };
   },
 });

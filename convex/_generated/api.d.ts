@@ -9,7 +9,6 @@
  */
 
 import type * as activity from "../activity.js";
-import type * as agentRuns from "../agentRuns.js";
 import type * as agent_automationsAgent from "../agent/automationsAgent.js";
 import type * as agent_chat from "../agent/chat.js";
 import type * as agent_data from "../agent/data.js";
@@ -22,6 +21,7 @@ import type * as agent_models from "../agent/models.js";
 import type * as agent_tools from "../agent/tools.js";
 import type * as agent_triage from "../agent/triage.js";
 import type * as agent_vectorAgent from "../agent/vectorAgent.js";
+import type * as agentRuns from "../agentRuns.js";
 import type * as aiSuggestions from "../aiSuggestions.js";
 import type * as apiKeys from "../apiKeys.js";
 import type * as attachments from "../attachments.js";
@@ -63,7 +63,6 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   activity: typeof activity;
-  agentRuns: typeof agentRuns;
   "agent/automationsAgent": typeof agent_automationsAgent;
   "agent/chat": typeof agent_chat;
   "agent/data": typeof agent_data;
@@ -76,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   "agent/tools": typeof agent_tools;
   "agent/triage": typeof agent_triage;
   "agent/vectorAgent": typeof agent_vectorAgent;
+  agentRuns: typeof agentRuns;
   aiSuggestions: typeof aiSuggestions;
   apiKeys: typeof apiKeys;
   attachments: typeof attachments;

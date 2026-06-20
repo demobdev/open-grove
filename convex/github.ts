@@ -78,17 +78,17 @@ export const handleGithubEvent = internalMutation({
 
     // ── MERGE QUEUE TRIGGER (Phase 6) ──
     if (args.event === "check_run") {
-      const branchName = body.check_run?.check_suite?.head_branch;
+      const branchName = body.check_run?.check_suite?.head_branch || body.check_run?.pull_requests?.[0]?.head?.ref;
       if (branchName && branchName.startsWith("og-merge-batch-")) {
         const conclusion = body.check_run?.conclusion;
         if (conclusion === "success" || conclusion === "failure" || conclusion === "cancelled") {
-          const status = conclusion === "success" ? "success" : "failure";
           for (const conn of connections) {
             await ctx.scheduler.runAfter(0, internal.mergeQueue.handleBatchStatus, {
               orgId: conn.orgId,
-              repoId: repoFullName,
+              repoFullName,
               branchName,
-              status,
+              ciStatus: conclusion,
+              ciRunUrl: body.check_run?.html_url,
             });
           }
         }
@@ -99,13 +99,14 @@ export const handleGithubEvent = internalMutation({
       if (branchName && branchName.startsWith("og-merge-batch-")) {
         const state = body.state; // success, failure, error
         if (state === "success" || state === "failure" || state === "error") {
-          const status = state === "success" ? "success" : "failure";
+          const ciStatus = state === "success" ? "success" : "failure";
           for (const conn of connections) {
             await ctx.scheduler.runAfter(0, internal.mergeQueue.handleBatchStatus, {
               orgId: conn.orgId,
-              repoId: repoFullName,
+              repoFullName,
               branchName,
-              status,
+              ciStatus,
+              ciRunUrl: body.target_url,
             });
           }
         }

@@ -750,6 +750,221 @@ const postPRComment = createTool({
   },
 });
 
+const createSkill = createTool({
+  description: "Create a new AI agent skill in the workspace. Use this to teach the agent new capabilities like summarizing PRs or triaging issues.",
+  inputSchema: jsonSchema<{
+    name: string;
+    description?: string;
+    type?: "triage" | "review" | "docs" | "security" | "style" | "release" | "custom";
+    content: string;
+  }>({
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      description: { type: "string" },
+      type: { type: "string", enum: ["triage", "review", "docs", "security", "style", "release", "custom"] },
+      content: { type: "string", description: "The system prompt or instruction for this skill" },
+    },
+    required: ["name", "content"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input) => {
+    return await ctx.runMutation(internal.agent.data.createSkillForAgent, {
+      orgId: ctx.orgId,
+      actorUserId: ctx.requestUserId,
+      name: input.name,
+      description: input.description,
+      type: input.type || "custom",
+      content: input.content,
+    });
+  },
+});
+
+const createLoop = createTool({
+  description: "Create a new agentic feedback loop combining an action skill and a validation skill. You MUST use createSkill first to create the skills if they don't exist.",
+  inputSchema: jsonSchema<{
+    name: string;
+    description?: string;
+    actionSkillId: string;
+    validationSkillId: string;
+    maxIterations?: number;
+  }>({
+    type: "object",
+    properties: {
+      name: { type: "string" },
+      description: { type: "string" },
+      actionSkillId: { type: "string", description: "The ID of the action skill" },
+      validationSkillId: { type: "string", description: "The ID of the validation skill" },
+      maxIterations: { type: "number", description: "Default is 3" },
+    },
+    required: ["name", "actionSkillId", "validationSkillId"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input) => {
+    return await ctx.runMutation(internal.agent.data.createLoopForAgent, {
+      orgId: ctx.orgId,
+      actorUserId: ctx.requestUserId,
+      name: input.name,
+      description: input.description,
+      actionSkillId: input.actionSkillId as Id<"skills">,
+      validationSkillId: input.validationSkillId as Id<"skills">,
+      maxIterations: input.maxIterations || 3,
+    });
+  },
+});
+
+const scrapeWebContent = createTool({
+  description: "Scrape the content of any public URL and return it as clean Markdown. Useful for reading external documentation, articles, or competitor sites.",
+  inputSchema: jsonSchema<{ url: string }>({
+    type: "object",
+    properties: {
+      url: { type: "string", description: "The fully qualified URL to scrape" },
+    },
+    required: ["url"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input): Promise<{ markdown: string; title?: string } | { error: string }> => {
+    const apiKey = process.env.FIRECRAWL_API_KEY;
+    if (!apiKey) {
+      return { error: "FIRECRAWL_API_KEY environment variable is missing on the server. Please add it to the Convex deployment." };
+    }
+    const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        url: input.url,
+        formats: ["markdown"],
+      }),
+    });
+
+    if (!response.ok) {
+      return { error: `Firecrawl API failed: ${response.statusText}` };
+    }
+    const data = await response.json();
+    if (!data.success) {
+      return { error: data.error || "Unknown scraping error" };
+    }
+    return {
+      markdown: data.data.markdown,
+      title: data.data.metadata?.title,
+    };
+  },
+});
+
+const spawnResearchAgent = createTool({
+  description: "Spawn a dedicated sub-agent to perform deep reasoning on a specific topic. Use this when you need to delegate a complex analytical task, synthesize a large amount of raw data, or run parallel reasoning without cluttering your main context.",
+  inputSchema: jsonSchema<{ task: string; rawDataToProcess?: string }>({
+    type: "object",
+    properties: {
+      task: { type: "string", description: "Detailed instructions for the sub-agent on what to analyze or write" },
+      rawDataToProcess: { type: "string", description: "Any raw text (like PR diffs, scraped markdown, issue bodies) the sub-agent should read to complete the task" },
+    },
+    required: ["task"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input): Promise<{ result: string }> => {
+    const prompt = `You are an expert Research Sub-Agent inside OpenGrove.
+Your objective is to accomplish the following task with extreme precision and depth.
+
+TASK:
+${input.task}
+
+${input.rawDataToProcess ? `\nRAW DATA TO PROCESS:\n${input.rawDataToProcess}\n` : ""}
+
+Analyze the provided information and produce a comprehensive, structured response that directly fulfills the task. Do not include pleasantries; output only the final synthesized report or answer.`;
+
+    const { text } = await generateText({
+      model: chatModel,
+      prompt,
+    });
+
+    return { result: text };
+  },
+});
+
+const queryGBrain = createTool({
+  description: "Query the local GBrain knowledge graph (long-term memory) for information about projects, past decisions, or surface data. Provide a semantic query.",
+  inputSchema: jsonSchema<{ query: string }>({
+    type: "object",
+    properties: {
+      query: { type: "string", description: "The semantic search query for GBrain" },
+    },
+    required: ["query"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input): Promise<{ results: any[] } | { error: string }> => {
+    // We expect the user to expose their local GBrain MCP/REST server via a tunnel
+    // e.g. ngrok http 8080 and set GBRAIN_API_URL in the Convex environment.
+    const gbrainUrl = process.env.GBRAIN_API_URL;
+    const gbrainKey = process.env.GBRAIN_API_KEY;
+    if (!gbrainUrl) {
+      return { error: "GBRAIN_API_URL is not set on the Convex deployment. The user must tunnel their local GBrain instance (e.g., via ngrok) and set this variable." };
+    }
+
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (gbrainKey) {
+        headers["Authorization"] = `Bearer ${gbrainKey}`;
+      }
+      
+      const response = await fetch(`${gbrainUrl}/query`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ query: input.query }),
+      });
+      if (!response.ok) {
+        return { error: `GBrain query failed: ${response.statusText}` };
+      }
+      const data = await response.json();
+      return { results: data.results || [] };
+    } catch (err) {
+      return { error: `Failed to connect to GBrain: ${(err as Error).message}` };
+    }
+  },
+});
+
+const syncGBrain = createTool({
+  description: "Sync or extract new information into the GBrain knowledge graph so it is remembered long-term.",
+  inputSchema: jsonSchema<{ content: string; source: string }>({
+    type: "object",
+    properties: {
+      content: { type: "string", description: "The raw text or knowledge to store in GBrain" },
+      source: { type: "string", description: "The source identifier (e.g. 'OpenGrove Agent', 'PR #123')" },
+    },
+    required: ["content", "source"],
+    additionalProperties: false,
+  }),
+  execute: async (ctx: VectorToolCtx, input): Promise<{ success: boolean; message: string }> => {
+    const gbrainUrl = process.env.GBRAIN_API_URL;
+    const gbrainKey = process.env.GBRAIN_API_KEY;
+    if (!gbrainUrl) {
+      return { success: false, message: "GBRAIN_API_URL is not set." };
+    }
+
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (gbrainKey) {
+        headers["Authorization"] = `Bearer ${gbrainKey}`;
+      }
+
+      const response = await fetch(`${gbrainUrl}/extract`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ text: input.content, metadata: { source: input.source } }),
+      });
+      if (!response.ok) {
+        return { success: false, message: `GBrain sync failed: ${response.statusText}` };
+      }
+      return { success: true, message: "Knowledge successfully extracted into GBrain." };
+    } catch (err) {
+      return { success: false, message: `Failed to connect to GBrain: ${(err as Error).message}` };
+    }
+  },
+});
+
 export const vectorTools = {
   listTeams,
   listMembers,
@@ -767,4 +982,10 @@ export const vectorTools = {
   mapPRToIssues,
   analyzePRRisk,
   postPRComment,
+  createSkill,
+  createLoop,
+  scrapeWebContent,
+  spawnResearchAgent,
+  queryGBrain,
+  syncGBrain,
 };

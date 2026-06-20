@@ -36,7 +36,6 @@ export function CreateLoopDialog({
   children?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const { orgSlug } = useParams<{ orgSlug: string }>();
   const createLoop = useMutation(api.loops.createLoop);
   const skills = useQuery(api.skills.listSkills);
 

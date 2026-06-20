@@ -99,15 +99,18 @@ export const mergeQueueStatusValidator = v.union(
   v.literal("batched"),
   v.literal("testing"),
   v.literal("merged"),
-  v.literal("failed")
+  v.literal("failed"),
+  v.literal("cancelled")
 );
 
 export const mergeBatchStatusValidator = v.union(
   v.literal("creating"),
   v.literal("testing"),
-  v.literal("passed"),
+  v.literal("awaiting_approval"),
+  v.literal("approved"),
   v.literal("failed"),
-  v.literal("merged")
+  v.literal("merged"),
+  v.literal("cancelled")
 );
 
 export const loopRunStatusValidator = v.union(
@@ -478,28 +481,61 @@ export default defineSchema({
 
   mergeBatches: defineTable({
     orgId: v.id("organizations"),
-    repoId: v.string(), // "owner/repo"
+    repoId: v.id("connectedRepos"),
+    repoFullName: v.string(),
+    targetBranch: v.string(),
     branchName: v.string(),
     prNumbers: v.array(v.number()),
     status: mergeBatchStatusValidator,
+    
+    ciStatus: v.union(
+      v.literal("pending"),
+      v.literal("success"),
+      v.literal("failure"),
+      v.literal("cancelled"),
+      v.literal("unknown")
+    ),
+    ciRunUrl: v.optional(v.string()),
+    lastCheckedAt: v.optional(v.number()),
+
+    approvedBy: v.optional(v.id("users")),
+    approvedAt: v.optional(v.number()),
+    mergedBy: v.optional(v.id("users")),
+    mergedAt: v.optional(v.number()),
+
+    idempotencyKey: v.string(),
+
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
   })
     .index("by_org", ["orgId"])
     .index("by_repo", ["repoId"])
+    .index("by_idempotency", ["idempotencyKey"])
     .index("by_org_and_status", ["orgId", "status"]),
 
   mergeQueueItems: defineTable({
     orgId: v.id("organizations"),
-    repoId: v.string(), // "owner/repo"
+    repoId: v.id("connectedRepos"),
+    repoFullName: v.string(),
+    targetBranch: v.string(),
     prNumber: v.number(),
+    
+    baseBranch: v.string(),
+    headBranch: v.string(),
+    headSha: v.string(),
+    changedFiles: v.array(v.string()),
+
     status: mergeQueueStatusValidator,
     batchId: v.optional(v.id("mergeBatches")),
+    
+    idempotencyKey: v.string(),
+
     addedAt: v.number(),
     processedAt: v.optional(v.number()),
   })
     .index("by_org", ["orgId"])
     .index("by_repo", ["repoId"])
+    .index("by_idempotency", ["idempotencyKey"])
     .index("by_repo_and_status", ["repoId", "status"])
     .index("by_batch", ["batchId"]),
 });

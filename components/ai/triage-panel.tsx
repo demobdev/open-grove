@@ -88,10 +88,13 @@ function TriagePanelInner({ issue }: IssueDetailSlotProps) {
     findDuplicates({ issueId: issue._id })
       .then((result) => {
         if (checkedIssueId.current !== issue._id) return;
-        if (result.ok) {
-          setDuplicates(result.duplicates);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((result as any).ok) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setDuplicates((result as any).duplicates);
         } else {
-          setDuplicatesError(result.error);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setDuplicatesError((result as any).error);
         }
       })
       .catch(() => {
@@ -109,14 +112,18 @@ function TriagePanelInner({ issue }: IssueDetailSlotProps) {
     setSuggestionError(null);
     suggestTriage({ issueId: issue._id })
       .then((result) => {
-        if (result.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((result as any).ok) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const r = result as any;
           setSuggestion({
-            priority: result.priority,
-            labels: result.labels,
-            reasoning: result.reasoning,
+            priority: r.priority,
+            labels: r.labels,
+            reasoning: r.reasoning,
           });
         } else {
-          setSuggestionError(result.error);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setSuggestionError((result as any).error);
         }
       })
       .catch(() => setSuggestionError("Could not generate suggestions."))
